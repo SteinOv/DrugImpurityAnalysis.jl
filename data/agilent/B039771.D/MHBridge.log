@@ -1,0 +1,70 @@
+Start executing script, opening method file..
+Start executing script, opening data file..
+0 : Starting...
+0 : Starting
+4 : Reading time segment information
+8 : Reading scan records
+8 : Reading scan records
+16 : Reading scan records
+25 : Reading scan records
+34 : Reading scan records
+43 : Reading scan records
+52 : Reading scan records
+60 : Reading scan records
+72 : Opening file and reading data
+81 : Opening file and reading data
+100 : Done opening file
+100 : Complete
+50 : Data file 1 of 1: B039771.d
+0 : Extracting 'TIC Scan (Integrate) (Cycle-summed)':  : Starting
+0 : Extracting 'TIC Scan (Integrate) (Cycle-summed)':  : Reading chromatogram information
+26 : Extracting 'TIC Scan (Integrate) (Cycle-summed)':  : Filtering scan records completed
+42 : Extracting 'TIC Scan (Integrate) (Cycle-summed)':  : Base chromatogram generation completed
+45 : Extracting 'TIC Scan (Integrate) (Cycle-summed)':  : Adding description information
+50 : Extracting 'TIC Scan (Integrate) (Cycle-summed)':  : Done preparing chromatograms
+75 : Integrating '+ TIC Scan'
+100 : Integrating '+ TIC Scan'
+100 : Complete
+0 : Starting...
+0 : Deleting previous results...
+10 : Finding compounds...
+12 : Preparing deconvolution parameters
+15 : Running deconvolution algorithm
+74 : Preparing and filtering 21 original compound results
+78 : Completed filtering, start extracting results for 3 compounds
+90 : Preparing results...
+91 : Adding compound 1 of  3 found
+100 : Complete
+80 : Starting...
+83 : Progressing ...
+86 : Progressing ...
+90 : Progressing ...
+93 : Progressing ...
+96 : Progressing ...
+100 : Progressing ...
+100 : Complete
+100 : Complete
+100 : Complete
+0 : Starting...
+0 : Combining identification results : User Chromatograms
+14 : Combining identification results : Cpd 1: 1-.alpha.-H,5-.alpha.-H-Nortropane-2-.beta.-carboxylic acid, 3-.beta.-hydroxy-, methyl ester,benzoate
+28 : Combining identification results : + Compound Spectrum (rt: 6.496-6.530 min)
+42 : Combining identification results : Cpd 2: Cocaine
+57 : Combining identification results : + Compound Spectrum (rt: 6.584-6.663 min)
+71 : Combining identification results : Cpd 3: Octacosane
+85 : Combining identification results : + Compound Spectrum (rt: 8.055-8.128 min)
+100 : Complete
+0 : Starting...
+0 : Saving 'B039771.d'
+9 : Saving 'User Chromatograms'
+19 : Saving '+ TIC Scan'
+28 : Saving 'User Spectra'
+38 : Saving 'Background Spectra'
+47 : Saving 'Compounds'
+57 : Saving 'Cpd 1: 1-.alpha.-H,5-.alpha.-H-Nortropane-2-.beta.-carboxylic acid, 3-.beta.-hydroxy-, methyl ester,benzoate'
+66 : Saving 'Cpd 2: Cocaine'
+76 : Saving 'Cpd 3: Octacosane'
+85 : Saving 'Matched Sequences'
+95 : Writing to disk.
+100 : Complete
+Automated data analysis successfully completed

@@ -1,0 +1,163 @@
+<?xml version="1.0" standalone="yes"?>
+<AuditTrailDataSet xmlns="http://tempuri.org/AuditTrailDataSet.xsd">
+  <AuditTrailEntry>
+    <ID>0</ID>
+    <ComputerName>GCMS-HP</ComputerName>
+    <User>GCMS-HP\Admin</User>
+    <TimeStamp>2018-02-08T13:38:54.3673953+01:00</TimeStamp>
+    <Reason>none defined</Reason>
+    <Comment>Created New Method: algemeen.M</Comment>
+  </AuditTrailEntry>
+  <AuditTrailEntry>
+    <ID>1</ID>
+    <ComputerName>GCMS-HP</ComputerName>
+    <User>system</User>
+    <TimeStamp>2018-12-03T14:08:46.2938207+01:00</TimeStamp>
+    <Reason>none defined</Reason>
+    <Comment>Updated the injector method settings for D:\MassHunter\Methods\algemeen.M</Comment>
+  </AuditTrailEntry>
+  <AuditTrailEntry>
+    <ID>2</ID>
+    <ComputerName>GCMS-HP</ComputerName>
+    <User>system</User>
+    <TimeStamp>2018-12-12T13:14:59.6991415+01:00</TimeStamp>
+    <Reason>none defined</Reason>
+    <Comment>Updated the GC method settings for D:\MassHunter\Methods\algemeen.M</Comment>
+  </AuditTrailEntry>
+  <AuditTrailEntry>
+    <ID>3</ID>
+    <ComputerName>GCMS2-HP</ComputerName>
+    <User>system</User>
+    <TimeStamp>2020-02-28T11:58:30.4393267+01:00</TimeStamp>
+    <Reason>none defined</Reason>
+    <Comment>Updated the GC method settings for D:\MassHunter\Methods\algemeen.M</Comment>
+  </AuditTrailEntry>
+  <AuditTrailEntry>
+    <ID>4</ID>
+    <ComputerName>GCMS2-HP</ComputerName>
+    <User>system</User>
+    <TimeStamp>2020-05-13T18:51:33.7931342+02:00</TimeStamp>
+    <Reason>none defined</Reason>
+    <Comment>Updated the GC method settings for D:\MassHunter\Methods\algemeen.M</Comment>
+  </AuditTrailEntry>
+  <LoggableModification>
+    <AuditLogEntryID>0</AuditLogEntryID>
+    <LoggableModificationID>0</LoggableModificationID>
+    <ChangeDescription>Initial Version</ChangeDescription>
+  </LoggableModification>
+  <LoggableModification>
+    <AuditLogEntryID>1</AuditLogEntryID>
+    <LoggableModificationID>1</LoggableModificationID>
+    <ChangeDescription>Filling Speed (µl/s)	5 -&gt; 2</ChangeDescription>
+  </LoggableModification>
+  <LoggableModification>
+    <AuditLogEntryID>2</AuditLogEntryID>
+    <LoggableModificationID>2</LoggableModificationID>
+    <ChangeDescription>Column #2 Pressure changed: 0.26399 bar -&gt; 0.62672 bar.</ChangeDescription>
+  </LoggableModification>
+  <LoggableModification>
+    <AuditLogEntryID>2</AuditLogEntryID>
+    <LoggableModificationID>3</LoggableModificationID>
+    <ChangeDescription>Column #2 Flow changed: 0.4 mL/min -&gt; 1.1 mL/min.</ChangeDescription>
+  </LoggableModification>
+  <LoggableModification>
+    <AuditLogEntryID>2</AuditLogEntryID>
+    <LoggableModificationID>4</LoggableModificationID>
+    <ChangeDescription>Column #2 Holdup Time changed: 1.6631 min -&gt; 0.71041 min.</ChangeDescription>
+  </LoggableModification>
+  <LoggableModification>
+    <AuditLogEntryID>2</AuditLogEntryID>
+    <LoggableModificationID>5</LoggableModificationID>
+    <ChangeDescription>Column #2 Flow changed: 0.4 mL/min for 0 min -&gt; 1.1 mL/min for 0 min.</ChangeDescription>
+  </LoggableModification>
+  <LoggableModification>
+    <AuditLogEntryID>2</AuditLogEntryID>
+    <LoggableModificationID>6</LoggableModificationID>
+    <ChangeDescription>Column #2 Flow Post Run changed: 0.4 mL/min -&gt; 0 mL/min.</ChangeDescription>
+  </LoggableModification>
+  <LoggableModification>
+    <AuditLogEntryID>2</AuditLogEntryID>
+    <LoggableModificationID>7</LoggableModificationID>
+    <ChangeDescription>Front Inlet Pressure changed: On 0.26399 bar -&gt; On 0.27626 bar.</ChangeDescription>
+  </LoggableModification>
+  <LoggableModification>
+    <AuditLogEntryID>2</AuditLogEntryID>
+    <LoggableModificationID>8</LoggableModificationID>
+    <ChangeDescription>Front Inlet Total Flow changed: On 5.4 mL/min -&gt; On 79.1 mL/min.</ChangeDescription>
+  </LoggableModification>
+  <LoggableModification>
+    <AuditLogEntryID>2</AuditLogEntryID>
+    <LoggableModificationID>9</LoggableModificationID>
+    <ChangeDescription>Front Inlet Gas Saver changed: Off -&gt; On    15 After 3 min.</ChangeDescription>
+  </LoggableModification>
+  <LoggableModification>
+    <AuditLogEntryID>2</AuditLogEntryID>
+    <LoggableModificationID>10</LoggableModificationID>
+    <ChangeDescription>Front Inlet Split Ratio changed: 5:1 -&gt; 68.182:1.</ChangeDescription>
+  </LoggableModification>
+  <LoggableModification>
+    <AuditLogEntryID>2</AuditLogEntryID>
+    <LoggableModificationID>11</LoggableModificationID>
+    <ChangeDescription>Front Inlet Split Flow changed: 2 mL/min -&gt; 75 mL/min.</ChangeDescription>
+  </LoggableModification>
+  <LoggableModification>
+    <AuditLogEntryID>2</AuditLogEntryID>
+    <LoggableModificationID>12</LoggableModificationID>
+    <ChangeDescription>Back Inlet Heater changed: On 300 °C -&gt; On 280 °C.</ChangeDescription>
+  </LoggableModification>
+  <LoggableModification>
+    <AuditLogEntryID>2</AuditLogEntryID>
+    <LoggableModificationID>13</LoggableModificationID>
+    <ChangeDescription>Back Inlet Pressure changed: On 0.27626 bar -&gt; On 0.62672 bar.</ChangeDescription>
+  </LoggableModification>
+  <LoggableModification>
+    <AuditLogEntryID>2</AuditLogEntryID>
+    <LoggableModificationID>14</LoggableModificationID>
+    <ChangeDescription>Back Inlet Total Flow changed: On 79.1 mL/min -&gt; On 9.6 mL/min.</ChangeDescription>
+  </LoggableModification>
+  <LoggableModification>
+    <AuditLogEntryID>2</AuditLogEntryID>
+    <LoggableModificationID>15</LoggableModificationID>
+    <ChangeDescription>Back Inlet Gas Saver changed: On    15 After 3 min -&gt; Off.</ChangeDescription>
+  </LoggableModification>
+  <LoggableModification>
+    <AuditLogEntryID>2</AuditLogEntryID>
+    <LoggableModificationID>16</LoggableModificationID>
+    <ChangeDescription>Back Inlet Split Ratio changed: 68.182:1 -&gt; 5:1.</ChangeDescription>
+  </LoggableModification>
+  <LoggableModification>
+    <AuditLogEntryID>2</AuditLogEntryID>
+    <LoggableModificationID>17</LoggableModificationID>
+    <ChangeDescription>Back Inlet Split Flow changed: 75 mL/min -&gt; 5.5 mL/min.</ChangeDescription>
+  </LoggableModification>
+  <LoggableModification>
+    <AuditLogEntryID>3</AuditLogEntryID>
+    <LoggableModificationID>18</LoggableModificationID>
+    <ChangeDescription>Column #2 deleted.</ChangeDescription>
+  </LoggableModification>
+  <LoggableModification>
+    <AuditLogEntryID>3</AuditLogEntryID>
+    <LoggableModificationID>19</LoggableModificationID>
+    <ChangeDescription>Back Inlet Split Flow changed: 5.5 mL/min -&gt; 0 mL/min.</ChangeDescription>
+  </LoggableModification>
+  <LoggableModification>
+    <AuditLogEntryID>3</AuditLogEntryID>
+    <LoggableModificationID>20</LoggableModificationID>
+    <ChangeDescription>Front Detector FID Heater changed: On 200 °C -&gt; On 150 °C.</ChangeDescription>
+  </LoggableModification>
+  <LoggableModification>
+    <AuditLogEntryID>3</AuditLogEntryID>
+    <LoggableModificationID>21</LoggableModificationID>
+    <ChangeDescription>Front Detector FID Makeup Flow changed: Off -&gt; On 5 mL/min.</ChangeDescription>
+  </LoggableModification>
+  <LoggableModification>
+    <AuditLogEntryID>4</AuditLogEntryID>
+    <LoggableModificationID>22</LoggableModificationID>
+    <ChangeDescription>Back Inlet Pressure changed: On 0.62672 bar -&gt; Off.</ChangeDescription>
+  </LoggableModification>
+  <LoggableModification>
+    <AuditLogEntryID>4</AuditLogEntryID>
+    <LoggableModificationID>23</LoggableModificationID>
+    <ChangeDescription>Back Inlet Total Flow changed: On 9.6 mL/min -&gt; Off.</ChangeDescription>
+  </LoggableModification>
+</AuditTrailDataSet>

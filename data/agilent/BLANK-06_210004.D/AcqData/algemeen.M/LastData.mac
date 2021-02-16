@@ -1,0 +1,6 @@
+﻿Name LastDataFile
+  LastDataPath$ = "D:\data\overige2021\rk\20200201rk_cocaimps_5xcase\" 
+  LastDataFile$ = "end blank.D" 
+  LastDataSize  = 15228615
+  remove LastDataFile
+  return

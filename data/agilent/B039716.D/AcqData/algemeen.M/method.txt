@@ -1,0 +1,37 @@
+﻿Additional Information for JSB startup.M
+File created Mon Aug 04 02:30:26 2014
+
+Method : D:\MassHunter\GCMS\1\METHODS\DEFAULT.M
+Renamed: D:\MassHunter\GCMS\1\METHODS\JSB startup.M
+Mon Aug 04 02:30:26 2014
+-----------------------------------------
+
+Method : D:\MassHunter\GCMS\1\methods\cannabis.M
+Renamed: D:\MassHunter\GCMS\1\methods\cocaine.M
+Thu Aug 07 13:26:38 2014
+-----------------------------------------
+
+Method : D:\MassHunter\GCMS\1\methods\cocaine.M
+Renamed: D:\MassHunter\GCMS\1\methods\cocaine_test.M
+Wed Aug 20 14:44:55 2014
+-----------------------------------------
+
+Method : D:\MassHunter\GCMS\1\methods\cocaine_test.M
+Renamed: D:\MassHunter\GCMS\1\methods\cocaine_15m.M
+Wed Oct 22 11:43:47 2014
+-----------------------------------------
+
+Method : D:\MassHunter\GCMS\1\methods\cocaine_15m.M
+Renamed: D:\MassHunter\Methods\algemeen.M
+Wed Dec 17 09:42:25 2014
+-----------------------------------------
+
+Method : D:\MassHunter\Methods\algemeen.m
+Renamed: D:\MassHunter\Methods\Cocaine_Kwantitatief.m
+Tue Apr 12 13:33:18 2016
+-----------------------------------------
+
+Method : D:\MassHunter\Methods\algemeen06022018.M
+Renamed: D:\MassHunter\Methods\algemeen.M
+Thu Feb 08 13:38:52 2018
+-----------------------------------------

@@ -1,0 +1,65 @@
+Start executing script, opening method file..
+Start executing script, opening data file..
+0 : Starting...
+0 : Starting
+4 : Reading time segment information
+8 : Reading scan records
+8 : Reading scan records
+16 : Reading scan records
+25 : Reading scan records
+34 : Reading scan records
+43 : Reading scan records
+52 : Reading scan records
+60 : Reading scan records
+72 : Opening file and reading data
+81 : Opening file and reading data
+100 : Done opening file
+100 : Complete
+50 : Data file 1 of 1: B039748.d
+0 : Extracting 'TIC Scan (Integrate) (Cycle-summed)':  : Starting
+0 : Extracting 'TIC Scan (Integrate) (Cycle-summed)':  : Reading chromatogram information
+26 : Extracting 'TIC Scan (Integrate) (Cycle-summed)':  : Filtering scan records completed
+42 : Extracting 'TIC Scan (Integrate) (Cycle-summed)':  : Base chromatogram generation completed
+45 : Extracting 'TIC Scan (Integrate) (Cycle-summed)':  : Adding description information
+50 : Extracting 'TIC Scan (Integrate) (Cycle-summed)':  : Done preparing chromatograms
+75 : Integrating '+ TIC Scan'
+100 : Integrating '+ TIC Scan'
+100 : Complete
+0 : Starting...
+0 : Deleting previous results...
+10 : Finding compounds...
+12 : Preparing deconvolution parameters
+15 : Running deconvolution algorithm
+74 : Preparing and filtering 19 original compound results
+78 : Completed filtering, start extracting results for 2 compounds
+90 : Preparing results...
+92 : Adding compound 1 of  2 found
+100 : Complete
+80 : Starting...
+85 : Progressing ...
+90 : Progressing ...
+95 : Progressing ...
+100 : Progressing ...
+100 : Complete
+100 : Complete
+100 : Complete
+0 : Starting...
+0 : Combining identification results : User Chromatograms
+20 : Combining identification results : Cpd 1: Cocaine
+40 : Combining identification results : + Compound Spectrum (rt: 6.582-6.668 min)
+60 : Combining identification results : Cpd 2: Octacosane
+80 : Combining identification results : + Compound Spectrum (rt: 8.052-8.128 min)
+100 : Complete
+0 : Starting...
+0 : Saving 'B039748.d'
+10 : Saving 'User Chromatograms'
+21 : Saving '+ TIC Scan'
+31 : Saving 'User Spectra'
+42 : Saving 'Background Spectra'
+52 : Saving 'Compounds'
+63 : Saving 'Cpd 1: Cocaine'
+73 : Saving 'Cpd 2: Octacosane'
+84 : Saving 'Matched Sequences'
+95 : Writing to disk.
+100 : Complete
+Automated data analysis successfully completed
