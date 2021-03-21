@@ -9,17 +9,22 @@ function main()
 
 	# Import spectra
 	spectra = batch_import(pathin)
+	instr = spectrum["MS_Instrument"]
+	spectrum = spectra[1]["MS1"]
 
-	spectrum = spectra[10]["MS1"]
-	mass = [81.9, 82.1]
-	mass = [182, 183] # 182.10000610351562 (5 @[1930, 137]), 182.10000610351562 (10 @[1930, 138])
 
 	spectrum_filtered = filter_mass(spectrum, mass)
 	println(spectrum["Rt"][findmax(spectrum_filtered)[2]])
 	plot(spectrum["Rt"], spectrum_filtered, xminorticks=0.1)
-	spectrum["Mz_values"][1930, :]
-	plot(spectrum["Mz_values"][1930, :], spectrum["Mz_intensity"][1930, :])
-	findmax(spectrum["Mz_intensity"][1930, :])
+	findmax(spectrum_filtered[1940:end])
+
+	spectrum_filtered[2490]
+
+	println(spectrum["Mz_intensity"][2490, :])
+	spectrum["Mz_values"][2490, 110]
+
+	plot(spectrum["Mz_values"][2490, :], spectrum["Mz_intensity"][2490, :])
+	findmax(spectrum["Mz_intensity"][2490, :])
 	findmax(spectrum["Mz_values"][1930, 138])
 
 	# print Rt and intensity of max for each spectrum
@@ -32,6 +37,38 @@ function main()
 	end
 end
 
+
+function cocaine_intensity(spectrum)
+	"""Returns intensity of cocaine peak if present, else 0""" 
+
+	# Cocaine approximate peak locations
+	RT = 6.66 # minutes
+	max_RT_deviation = 0.1 # minutes
+	mass_vals = [82.07, 182.12, 83.07, 94.07, 77.04, 105.03, 96.08, 42.03, 303.15]
+	max_mass_deviation = 0.05 
+
+	RT_range = [RT - max_RT_deviation, RT + max_RT_deviation]
+	RT_range_index = RT_indices(spectrum, RT_range)
+
+	for mass in mass_vals
+		mass_range = [mass - max_mass_deviation, mass + max_mass_deviation]
+		spectrum_XIC = filter_mass(spectrum, mass_range)
+		max = findmax(spectrum_XIC[RT_range_index[1]:RT_range_index[2]]) # max[1] = int, [2] = index
+		println("$mass: $(max[1])")
+	end
+
+end
+
+function RT_indices(spectrum, RT)
+	"""Returns index range of given retention time range"""
+
+	# Only possible if Rt is sorted
+	if !issorted(spectrum["Rt"])
+		error("Error: Retention time array is not in order")
+	end
+	
+	return [findfirst(i -> i >= RT[1], spectrum["Rt"]), findlast(i -> i <= RT[2], spectrum["Rt"])]
+end
 
 function filter_mass(spectrum, mass)
 	"""Returns filtered spectrum based on mass range"""
@@ -78,6 +115,7 @@ function batch_import(pathin)
 	for i in supported_indices
 		filenames = [files[i]]
 		spectra[i] = import_files(pathin,filenames,mz_thresh,Int_thresh)
+		println("Read spectra $i")
 	end
 
 	return spectra
