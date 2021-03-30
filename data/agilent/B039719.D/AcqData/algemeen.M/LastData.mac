@@ -1,6 +1,0 @@
-﻿Name LastDataFile
-  LastDataPath$ = "D:\data\overige2021\rk\20200201rk_cocacase28x\" 
-  LastDataFile$ = "B039716.D" 
-  LastDataSize  = 9842025
-  remove LastDataFile
-  return
