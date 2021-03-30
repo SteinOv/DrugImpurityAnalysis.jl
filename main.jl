@@ -55,12 +55,19 @@ function cocaine_intensity(spectrum)
 	RT = 6.66 # minutes
 	mass_vals = [82.07, 182.12, 83.07, 94.07, 77.04, 105.03, 96.08, 42.03, 303.15]
 	
-	return compound_intensity(spectrum, RT, mass_vals)
+	return integrate_peak(spectrum, RT, mass_vals)
 
 end
 
-function compound_intensity(spectrum, RT, mass_vals)
-	"""Determines intensity of specific compound"""
+
+"""
+TODO
+- Improve overlapping peak integration by predicting actual integral after peak overlap
+- Noise cut off determined dynamically
+
+"""
+function integrate_peak(spectrum, RT, mass_vals)
+	"""Integrates peak of specific compound"""
 	noise_cutoff = 5000 # TODO Maybe determined dynamically
 
 	max_RT_deviation = 0.1 # minutes
@@ -112,6 +119,7 @@ function compound_intensity(spectrum, RT, mass_vals)
 				# Peaks overlap, found increase in intensity 5 consecutive times
 				else
 					current_index = min_index
+					println("WARNING: Peak overlap at RT: $(spectrum["RT"][current_index]) and index: $current_index")
 					break
 				end
 			end
