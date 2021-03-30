@@ -6,7 +6,7 @@ function main()
 
 	# Specify path
 	folder = "P:/Git/bachelor_project"
-	mzxml_path = "data/mzxml"
+	mzxml_path = "data/control_5&50"
 	pathin = joinpath(folder, mzxml_path)
 
 	# Import spectra
@@ -14,7 +14,7 @@ function main()
 
 
 
-	# spectrum = spectra[6]["MS1"]
+	# spectrum = spectra[1]["MS1"]
 
 
 	normalized_list = zeros(Float32, length(spectra))
@@ -40,9 +40,9 @@ function main()
 		println("----------------------------")
 	end
 
-	println("Normalized list:")
+	println("Normalized list (182.12):")
 	for i in normalized_list
-		@printf("%1.3f", i)
+		@printf("%1.3f\n", i)
 	end
 
 end
@@ -119,7 +119,7 @@ function integrate_peak(spectrum, RT, mass_vals)
 				# Peaks overlap, found increase in intensity 5 consecutive times
 				else
 					current_index = min_index
-					println("WARNING: Peak overlap at RT: $(spectrum["RT"][current_index]) and index: $current_index")
+					println("WARNING: Peak overlap at RT: $(spectrum["Rt"][current_index]), mass: $mass, index: $current_index")
 					break
 				end
 			end
@@ -138,7 +138,7 @@ function integrate_peak(spectrum, RT, mass_vals)
 end
 
 
-function plt(mass, mass2=0, RT=6.66, RT_deviation=0.1)
+function plt(mass=0, mass2=0, RT=6.66, RT_deviation=0.1)
 	"""Plot spectrum of given mass
 	plt(mass, (mass2), (RT), (RT_deviation) )
 
@@ -212,7 +212,7 @@ function batch_import(pathin)
 	"""Returns list containing all imported spectra from folder"""
 	mz_thresh = [0, 0]
 	Int_thresh = 0
-	files = readdir(pathin)
+	files = readdir(pathin, sort=false)
 	files_supported = zeros(Bool, length(files),1)
 
 	# Determine supported files
@@ -230,9 +230,9 @@ function batch_import(pathin)
 	spectra = Array{Any}(undef,size(supported_indices,1))
 
 	# Load files into spectra array
-	for i in supported_indices
-		filenames = [files[i]]
-		spectra[i] = import_files(pathin,filenames,mz_thresh,Int_thresh)
+	for (i, file_index) in enumerate(supported_indices)
+		filename = [files[file_index]]
+		spectra[i] = import_files(pathin,filename,mz_thresh,Int_thresh)
 		println("Read spectra $(i[1]) of $num_of_spectra")
 	end
 
