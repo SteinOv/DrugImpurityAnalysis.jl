@@ -4,6 +4,16 @@ using Printf
 using CSV
 using DataFrames
 
+# Minimum intensity of cocaine to process sample
+MIN_INTENSITY = 10^4
+
+
+
+"""
+TODO
+- Major compound (cocaine) must be the first compound in compounds.csv,
+  could implement sorting of DataFrame to allow different order in compounds.csv
+"""
 function main()
 
 	# Specify path
@@ -27,31 +37,54 @@ function main()
 
 	# push!(imp_profile, ["test", 1.3, 1.3, 1.3, 1.3, 1.3, 1.3, 1.3, 1.3, 1.3, 1.3, 1.3, 1.3, 1.3, 1.3, 1.3, 1.3, 1.3])
 
-	for (i, spectrum) in enumerate(spectra)
-		
+	for i=1:length(spectra)
+		spectrum = spectra[i]["MS1"]
+		sample_profile = []
+
 		# Integrate peaks of all compounds
 		for row in eachrow(compounds)
 			compound = row[1]
 			RT = row[2]
-			if RT == 0
+
+			# Skip invalid compounds
+			if RT == 0 || any(ismissing, [RT, compound, row[3]])
 				continue
 			end
 			mass_vals = split(row[3], ";")
 
-			integrate_peaks(spectrum, RT, mass_vals)
+			# Integrate all mz values
+			mass_integral = integrate_peaks(spectrum, RT, mass_vals)
+
+			# Determine final intensity for use in RT_deviation
+			intensity = determine_intensity(mass_integral)
+
+			# For major component (cocaine)
+			if row[5] == -1 && intensity < MIN_INTENSITY
+				
+				push!(imp_profile, )
 
 		end
 	end
 
 
 
-	# spectrum = spectra[6]["MS1"]
+	# spectrum = spectra[4]["MS1"]
 
 
 
 
 end
 
+function determine_intensity(mass_integral)
+	"""
+	Determines final intensity for use in ratios
+	Just sums all integrals for now
+	"""
+	return sum(mass_integral[:, 2])
+
+
+
+# TEMPORARY
 function cocaine_normalized_list(spectra)
 """Print intensities of mz peaks of cocaine for each spectrum"""
 
@@ -82,6 +115,7 @@ function cocaine_normalized_list(spectra)
 		@printf("%1.3f\n", i)
 	end
 
+# TEMPORARY
 function cocaine_intensity(spectrum)
 	"""Returns intensity of cocaine peak if present, else 0"""
 
@@ -145,7 +179,7 @@ function integrate_peaks(spectrum, RT, mass_vals)
 			count_intensity_incr = 0
 
 			# Continue until below noise_cutoff or begin/end of spectrum reached
-			while current_intensity > noise_cutoff & !(current_index in [1, length(spectrum_XIC)])
+			while current_intensity > noise_cutoff && !(current_index in [1, length(spectrum_XIC)])
 				current_index += direction
 				current_intensity = spectrum_XIC[j]
 
@@ -196,7 +230,7 @@ function plt(mass=0, mass2=0, RT=0, RT_deviation=0.1)
 	RT_range = [RT - RT_deviation, RT + RT_deviation]
 	RT_range_index = RT_indices(spectrum, RT_range)
 
-	if mass > 0 & mass2 <= 0
+	if mass > 0 && mass2 <= 0
 		mass_range = [mass - max_mass_deviation, mass + max_mass_deviation]
 	elseif mass > 0
 		mass_range = [mass, mass2]
@@ -272,6 +306,7 @@ function batch_import(pathin)
 	for (i, file_index) in enumerate(supported_indices)
 		filename = [files[file_index]]
 		spectra[i] = import_files(pathin,filename,mz_thresh,Int_thresh)
+		spectra[i]["MS1"]["Filename"] = filename
 		println("Read spectra $(i[1]) of $num_of_spectra")
 	end
 
