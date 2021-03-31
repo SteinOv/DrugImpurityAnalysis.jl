@@ -6,7 +6,7 @@ function main()
 
 	# Specify path
 	folder = "P:/Git/bachelor_project"
-	mzxml_path = "data/control_5&50"
+	mzxml_path = "data/random"
 	pathin = joinpath(folder, mzxml_path)
 
 	# Import spectra
@@ -14,7 +14,7 @@ function main()
 
 
 
-	# spectrum = spectra[1]["MS1"]
+	# spectrum = spectra[6]["MS1"]
 
 
 	normalized_list = zeros(Float32, length(spectra))
