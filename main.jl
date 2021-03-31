@@ -1,6 +1,8 @@
 using MS_Import
 using Plots
 using Printf
+using CSV
+using DataFrames
 
 function main()
 
@@ -12,14 +14,49 @@ function main()
 	# Import spectra
 	spectra = batch_import(pathin)
 
+	# Import RT and mz info of compounds into DataFrame
+	compounds = CSV.read("Compounds.csv", DataFrame)
+
+	# Create DataFrame for storing impurity profile (output)
+	imp_profile = DataFrame()
+	insertcols!(imp_profile, :sample => String[])
+	for name in compounds[!, "compound"]
+		insertcols!(imp_profile, Symbol(name) => Float32[])
+	end
+
+
+	# push!(imp_profile, ["test", 1.3, 1.3, 1.3, 1.3, 1.3, 1.3, 1.3, 1.3, 1.3, 1.3, 1.3, 1.3, 1.3, 1.3, 1.3, 1.3, 1.3])
+
+	for (i, spectrum) in enumerate(spectra)
+		
+		# Integrate peaks of all compounds
+		for row in eachrow(compounds)
+			compound = row[1]
+			RT = row[2]
+			if RT == 0
+				continue
+			end
+			mass_vals = split(row[3], ";")
+
+			integrate_peaks(spectrum, RT, mass_vals)
+
+		end
+	end
+
 
 
 	# spectrum = spectra[6]["MS1"]
 
 
+
+
+end
+
+function cocaine_normalized_list(spectra)
+"""Print intensities of mz peaks of cocaine for each spectrum"""
+
 	normalized_list = zeros(Float32, length(spectra))
 
-	# Print intensities of mz peaks of cocaine for each spectrum
 	for i=1:length(spectra)
 		spectrum = spectra[i]["MS1"]
 		println("Spectrum $i: \t Mass \t   Intensity     Normalised Intensity")
@@ -45,9 +82,6 @@ function main()
 		@printf("%1.3f\n", i)
 	end
 
-end
-
-
 function cocaine_intensity(spectrum)
 	"""Returns intensity of cocaine peak if present, else 0"""
 
@@ -55,7 +89,7 @@ function cocaine_intensity(spectrum)
 	RT = 6.66 # minutes
 	mass_vals = [82.07, 182.12, 83.07, 94.07, 77.04, 105.03, 96.08, 42.03, 303.15]
 	
-	return integrate_peak(spectrum, RT, mass_vals)
+	return integrate_peaks(spectrum, RT, mass_vals)
 
 end
 
@@ -66,8 +100,13 @@ TODO
 - Noise cut off determined dynamically
 
 """
-function integrate_peak(spectrum, RT, mass_vals)
-	"""Integrates peak of specific compound"""
+function integrate_peaks(spectrum, RT, mass_vals)
+	"""
+	Integrates peaks of specific compound
+
+	Returns matrix mass_integral, where row 1 are the mz values
+	and row 2 the corresponding intensities
+	"""
 	noise_cutoff = 5000 # TODO Maybe determined dynamically
 
 	max_RT_deviation = 0.1 # minutes
@@ -138,15 +177,15 @@ function integrate_peak(spectrum, RT, mass_vals)
 end
 
 
-function plt(mass=0, mass2=0, RT=6.66, RT_deviation=0.1)
+function plt(mass=0, mass2=0, RT=0, RT_deviation=0.1)
 	"""Plot spectrum of given mass
-	plt(mass, (mass2), (RT), (RT_deviation) )
+	plt((mass), (mass2), (RT), (RT_deviation))
 
 	only mass given: XIC at specific mass
 	mass and mass2: XIC between range
 	mass = 0: Spectrum not filtered
 
-	RT given: Zooms in around given RT (6.66 default)
+	RT given: Zooms in around given RT
 	RT = 0: Shows complete RT spectrum
 	RT_deviation: Deviation around RT (default 0.1)
 	"""
