@@ -6,7 +6,7 @@ using DataFrames
 # using StaticArrays
 
 # Minimum intensity of cocaine to process sample
-MIN_INTENSITY = 10^4
+MIN_INTENSITY = 10^5
 
 
 
@@ -19,8 +19,9 @@ function main()
 
 	# Specify path
 	folder = "P:/Git/bachelor_project"
-	mzxml_path = "data/random"
+	mzxml_path = "data/mzxml"
 	pathin = joinpath(folder, mzxml_path)
+	csvout = joinpath(pathin, "impurity_profile.csv")
 
 	# Import spectra
 	spectra = batch_import(pathin)
@@ -39,6 +40,7 @@ function main()
 
 	sample_profile = Vector(undef, size(imp_profile, 2))
 	for i=1:length(spectra)
+		println("Analysing spectrum $i...")
 		spectrum = spectra[i]["MS1"]
 		sample_profile[1] = spectrum["Filename"][1]
 		# sample_profile = zeros(Int16, size(compounds, 1))
@@ -67,7 +69,6 @@ function main()
 			# Does not contain major compound (cocaine)
 			elseif row[5] == -1
 				sample_profile[2:end] .= 0
-				push!(imp_profile, sample_profile)
 				break
 			end
 			
@@ -75,8 +76,10 @@ function main()
 		end
 
 		push!(imp_profile, sample_profile)
+		println("Done")
 	end
 
+	CSV.write(csvout, imp_profile)
 
 
 	# spectrum = spectra[4]["MS1"]
@@ -154,7 +157,8 @@ function integrate_peaks(spectrum, RT, mass_vals)
 	and row 2 the corresponding intensities
 	"""
 
-	noise_cutoff = 5000 # TODO Maybe determined dynamically
+	# Minimum peak height, otherwise intensity is set to 0
+	noise_cutoff = 1500 # TODO Maybe determined dynamically
 
 	max_RT_deviation = 0.1 # minutes
 	max_mass_deviation = 0.5 
@@ -180,48 +184,78 @@ function integrate_peaks(spectrum, RT, mass_vals)
 			continue
 		end
 
+		peak_range = zeros(Int16, 2)
 
-		# Used for integrating peak
-		integral = max_intensity
-		index_range = zeros(Int16, 2)
-
-		# Look for left and right side of peak
 		for (j, direction) in enumerate([-1, 1])
-			current_intensity = min_intensity = max_intensity
-			current_index = min_index = max_index
-			count_intensity_incr = 0
-
-			# Continue until below noise_cutoff or begin/end of spectrum reached
-			while current_intensity > noise_cutoff && !(current_index in [1, length(spectrum_XIC)])
-				current_index += direction
-				current_intensity = spectrum_XIC[j]
-
-				if current_intensity < min_intensity
-					min_intensity = current_intensity 
-					min_index = current_index
-					count_intensity_incr = 0
-				elseif count_intensity_incr < 5
-					count_intensity_incr += 1
-				# Peaks overlap, found increase in intensity 5 consecutive times
-				else
-					current_index = min_index
-					println("WARNING: Peak overlap at RT: $(spectrum["Rt"][current_index]), mass: $mass, index: $current_index")
-					break
-				end
+			peak_end = find_end_of_peak(spectrum_XIC, max_intensity, max_index, direction, noise_cutoff)
+			peak_range[j] = peak_end[1]
+			if peak_end[2]
+				println("WARNING: Peak overlap at file: $(spectrum["Filename"][1])")
+				println("RT: $(spectrum["Rt"][peak_end[1]]), mass: $mass, index: $(peak_end[1])")
 			end
+		end
 
-			index_range[j] = current_index
-		end	
+		integral = sum(spectrum_XIC[peak_range[1]:peak_range[2]])
 
-		integral = sum(spectrum_XIC[index_range[1]:index_range[2]])
+		if peak_range[1] == 0 || peak_range[2] == length(spectrum_XIC)
+			println("Range: $(peak_range[1]) - $(peak_range[2])")
+			println("RT: $(spectrum["Rt"][peak_range[1]]) - $(spectrum["Rt"][peak_range[2]]), mass: $mass, start_index: $(peak_range[1]), end_index: $(peak_range[2])")
+		end
 
 		mass_integral[i,:] = [mass, integral]
 		
 	end
 
 	return mass_integral
-
 end
+
+function find_end_of_peak(spectrum_XIC, max_intensity, max_index, direction, noise_cutoff)
+
+	current_intensity = max_intensity
+	last_intensity = 0
+	current_index = max_index
+	recurring_intensity_incr = 0
+	reached_noise = false
+	above_noise_cutoff = true
+
+	while recurring_intensity_incr < 5 && !reached_noise
+		current_index += direction
+
+		if current_index == 0 || current_index == length(spectrum_XIC)
+			reached_noise = true
+			current_index -= direction 
+			break
+		end
+		current_intensity = spectrum_XIC[current_index]
+
+		# Intensity decreasing and above noise cut off
+		if current_intensity < last_intensity && above_noise_cutoff && current_intensity > noise_cutoff
+			recurring_intensity_incr = 0
+		# Intensity increasing and above noise cut off
+		elseif current_intensity > last_intensity && above_noise_cutoff
+			recurring_intensity_incr += 1
+		# Below noise cut off for the first time
+		elseif current_intensity < noise_cutoff && above_noise_cutoff
+			above_noise_cutoff = false
+		# Below noise cut off and intensity increasing (reached noise)
+		elseif !above_noise_cutoff && current_intensity > last_intensity
+			reached_noise = true
+		end
+		last_intensity = current_intensity
+	end
+
+	# Peak overlap
+	if !reached_noise
+		current_index -= recurring_intensity_incr * direction
+		peak_overlap = true
+	else
+		peak_overlap = false
+	end
+
+	return current_index, peak_overlap
+end
+
+	
 
 
 function plt(mass=0, mass2=0, RT=0, RT_deviation=0.1)
@@ -239,7 +273,7 @@ function plt(mass=0, mass2=0, RT=0, RT_deviation=0.1)
 
 	# TODO gives error at start and end
 
-	max_mass_deviation = 0.05 
+	max_mass_deviation = 0.5 
 	RT_range = [RT - RT_deviation, RT + RT_deviation]
 	RT_range_index = RT_indices(spectrum, RT_range)
 
