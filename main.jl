@@ -3,6 +3,7 @@ using Plots
 using Printf
 using CSV
 using DataFrames
+# using StaticArrays
 
 # Minimum intensity of cocaine to process sample
 MIN_INTENSITY = 10^4
@@ -24,24 +25,23 @@ function main()
 	# Import spectra
 	spectra = batch_import(pathin)
 
-	# Import RT and mz info of compounds into DataFrame
-	compounds = CSV.read("Compounds.csv", DataFrame)
+	# Import RT and mz info of valid compounds into DataFrame
+	compounds = CSV.read("compounds.csv", DataFrame)
+	filter!(row -> !(any(ismissing, (row.RT, row.mz)) || any((row.RT, row.mz) .== 0)), compounds)
 
 
-	# TODO remove invalid compounds
 	# Create DataFrame for storing impurity profile (output)
 	imp_profile = DataFrame()
 	insertcols!(imp_profile, :sample => String[])
 	for name in compounds[!, "compound"]
-		insertcols!(imp_profile, Symbol(name) => Float32[])
+		insertcols!(imp_profile, Symbol(name) => Int16[])
 	end
 
-
-	# push!(imp_profile, ["test", 1.3, 1.3, 1.3, 1.3, 1.3, 1.3, 1.3, 1.3, 1.3, 1.3, 1.3, 1.3, 1.3, 1.3, 1.3, 1.3, 1.3])
-
+	sample_profile = Vector(undef, size(imp_profile, 2))
 	for i=1:length(spectra)
 		spectrum = spectra[i]["MS1"]
-		sample_profile = zeros(size(compounds, 1))
+		sample_profile[1] = spectrum["Filename"][1]
+		# sample_profile = zeros(Int16, size(compounds, 1))
 		major_intensity = 0
 
 		# Integrate peaks of all compounds
@@ -49,33 +49,32 @@ function main()
 			compound = row[1]
 			RT = row[2]
 
-			# Skip invalid compounds TODO remove invalid compounds directly from dataframe instead
-			if RT == 0 || any(ismissing, [RT, compound, row[3]])
-				continue
-			end
 			mass_vals = split(row[3], ";")
 			mass_vals = [parse(Float32, mass) for mass in mass_vals]
 
 			# Integrate all mz values
 			mass_integral = integrate_peaks(spectrum, RT, mass_vals)
 
+
 			# Determine final intensity for use in RT_deviation
 			intensity = determine_intensity(mass_integral)
 
-			# For major component (cocaine)
+			# For major compound (cocaine)
 			if row[5] == -1 && intensity > MIN_INTENSITY
 				major_intensity = intensity
-				sample_profile[1] = 1.00
+				sample_profile[2] = 1000
 				continue
+			# Does not contain major compound (cocaine)
 			elseif row[5] == -1
-				push!(imp_profile, append!(spectrum["Filename"][1], zeros(size(compounds, 1))))
+				sample_profile[2:end] .= 0
+				push!(imp_profile, sample_profile)
 				break
 			end
 			
-			sample_profile[j] = intensity/major_intensity
+			sample_profile[j + 1] = round(Int, intensity/major_intensity * 1000)
 		end
 
-		push!(imp_profile, append!(spectrum["Filename"][1], sample_profile))
+		push!(imp_profile, sample_profile)
 	end
 
 
@@ -100,7 +99,7 @@ end
 function cocaine_normalized_list(spectra)
 """Print intensities of mz peaks of cocaine for each spectrum"""
 
-	normalized_list = zeros(Float32, length(spectra))
+	normalized_list = zeros(Int16, length(spectra))
 
 	for i=1:length(spectra)
 		spectrum = spectra[i]["MS1"]
@@ -111,10 +110,10 @@ function cocaine_normalized_list(spectra)
 		
 		for (mass, intensity) in zip(mass_intensity[:, 1], mass_intensity[:, 2])
 			# println("$mass: $intensity")
-			@printf("\t\t%3.2f\t| %10.3E  |  %1.3f\n", mass, intensity, intensity/norm)
+			@printf("\t\t%3.2f\t| %10.3E  |  %4i\n", mass, intensity, intensity/norm)
 
 			if mass == 182.12
-				normalized_list[i] = intensity/norm
+				normalized_list[i] = round(Int16, intensity/norm * 1000)
 			end
 
 		end
@@ -124,9 +123,10 @@ function cocaine_normalized_list(spectra)
 
 	println("Normalized list (182.12):")
 	for i in normalized_list
-		@printf("%1.3f\n", i)
+		@printf("%4i\n", i)
 	end
 
+end
 # TEMPORARY
 function cocaine_intensity(spectrum)
 	"""Returns intensity of cocaine peak if present, else 0"""
@@ -153,6 +153,7 @@ function integrate_peaks(spectrum, RT, mass_vals)
 	Returns matrix mass_integral, where row 1 are the mz values
 	and row 2 the corresponding intensities
 	"""
+
 	noise_cutoff = 5000 # TODO Maybe determined dynamically
 
 	max_RT_deviation = 0.1 # minutes
