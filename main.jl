@@ -27,6 +27,8 @@ function main()
 	# Import RT and mz info of compounds into DataFrame
 	compounds = CSV.read("Compounds.csv", DataFrame)
 
+
+	# TODO remove invalid compounds
 	# Create DataFrame for storing impurity profile (output)
 	imp_profile = DataFrame()
 	insertcols!(imp_profile, :sample => String[])
@@ -39,18 +41,20 @@ function main()
 
 	for i=1:length(spectra)
 		spectrum = spectra[i]["MS1"]
-		sample_profile = []
+		sample_profile = zeros(size(compounds, 1))
+		major_intensity = 0
 
 		# Integrate peaks of all compounds
-		for row in eachrow(compounds)
+		for (j, row) in enumerate(eachrow(compounds))
 			compound = row[1]
 			RT = row[2]
 
-			# Skip invalid compounds
+			# Skip invalid compounds TODO remove invalid compounds directly from dataframe instead
 			if RT == 0 || any(ismissing, [RT, compound, row[3]])
 				continue
 			end
 			mass_vals = split(row[3], ";")
+			mass_vals = [parse(Float32, mass) for mass in mass_vals]
 
 			# Integrate all mz values
 			mass_integral = integrate_peaks(spectrum, RT, mass_vals)
@@ -59,11 +63,19 @@ function main()
 			intensity = determine_intensity(mass_integral)
 
 			# For major component (cocaine)
-			if row[5] == -1 && intensity < MIN_INTENSITY
-				
-				push!(imp_profile, )
-
+			if row[5] == -1 && intensity > MIN_INTENSITY
+				major_intensity = intensity
+				sample_profile[1] = 1.00
+				continue
+			elseif row[5] == -1
+				push!(imp_profile, append!(spectrum["Filename"][1], zeros(size(compounds, 1))))
+				break
+			end
+			
+			sample_profile[j] = intensity/major_intensity
 		end
+
+		push!(imp_profile, append!(spectrum["Filename"][1], sample_profile))
 	end
 
 
@@ -81,7 +93,7 @@ function determine_intensity(mass_integral)
 	Just sums all integrals for now
 	"""
 	return sum(mass_integral[:, 2])
-
+end
 
 
 # TEMPORARY
