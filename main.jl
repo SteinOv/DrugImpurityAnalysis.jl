@@ -18,9 +18,9 @@ TODO
 function main()
 
 	# Specify path
-	folder = "P:/Git/bachelor_project"
-	mzxml_path = "data/mzxml"
-	pathin = joinpath(folder, mzxml_path)
+	data_folder = "P:/Git/bachelor_project/data"
+	subfolder = "mzxml"
+	pathin = joinpath(data_folder, subfolder)
 	csvout = joinpath(pathin, "impurity_profile.csv")
 
 	# Import spectra
@@ -38,6 +38,7 @@ function main()
 		insertcols!(imp_profile, Symbol(name) => Int16[])
 	end
 
+	# Analyse all spectra
 	sample_profile = Vector(undef, size(imp_profile, 2))
 	for i=1:length(spectra)
 		println("Analysing spectrum $i...")
@@ -147,6 +148,7 @@ end
 TODO
 - Improve overlapping peak integration by predicting actual integral after peak overlap
 - Noise cut off determined dynamically
+- Peak shape should be the same for each mass, only determine peak range for one mass
 
 """
 function integrate_peaks(spectrum, RT, mass_vals)
@@ -166,42 +168,37 @@ function integrate_peaks(spectrum, RT, mass_vals)
 	RT_range = [RT - max_RT_deviation, RT + max_RT_deviation]
 	RT_range_index = RT_indices(spectrum, RT_range)
 
+	# Determine peak range based on first mass
+	mass = mass_vals[1]
+	mass_range = [mass - max_mass_deviation, mass + max_mass_deviation]
+	spectrum_XIC = filter_XIC(spectrum, mass_range)
+
+	# Determine maximum within RT and mass range
+	(max_intensity, max_index) = findmax(spectrum_XIC[RT_range_index[1]:RT_range_index[2]])
+	max_index += RT_range_index[1] - 1
+
 	mass_integral = zeros(Float64, length(mass_vals), 2)
 
-	# Loop through every mass
+	# Below noise cutoff, set intensity to zero
+	if max_intensity < noise_cutoff
+		mass_integral[:, 1] .= mass_vals
+		return mass_integral
+	end
+
+	peak_range = zeros(Int16, 2)
+
+	for (j, direction) in enumerate([-1, 1])
+		peak_end = find_end_of_peak(spectrum_XIC, max_intensity, max_index, direction, noise_cutoff)
+		peak_range[j] = peak_end[1]
+		if peak_end[2]
+			println("WARNING: Peak overlap at file: $(spectrum["Filename"][1])")
+			println("RT: $(spectrum["Rt"][peak_end[1]]), mass: $mass, index: $(peak_end[1])")
+		end
+	end
+
+	# Integrate peak for all mz values
 	for (i, mass) in enumerate(mass_vals)
-		mass_range = [mass - max_mass_deviation, mass + max_mass_deviation]
-		spectrum_XIC = filter_XIC(spectrum, mass_range)
-
-		# Determine maximum within RT and mass range
-		(max_intensity, max_index) = findmax(spectrum_XIC[RT_range_index[1]:RT_range_index[2]])
-		max_index += RT_range_index[1] - 1
-
-
-		# Below noise cutoff, set intensity to zero
-		if max_intensity < noise_cutoff
-			mass_integral[i,:] = [mass, 0]
-			continue
-		end
-
-		peak_range = zeros(Int16, 2)
-
-		for (j, direction) in enumerate([-1, 1])
-			peak_end = find_end_of_peak(spectrum_XIC, max_intensity, max_index, direction, noise_cutoff)
-			peak_range[j] = peak_end[1]
-			if peak_end[2]
-				println("WARNING: Peak overlap at file: $(spectrum["Filename"][1])")
-				println("RT: $(spectrum["Rt"][peak_end[1]]), mass: $mass, index: $(peak_end[1])")
-			end
-		end
-
 		integral = sum(spectrum_XIC[peak_range[1]:peak_range[2]])
-
-		if peak_range[1] == 0 || peak_range[2] == length(spectrum_XIC)
-			println("Range: $(peak_range[1]) - $(peak_range[2])")
-			println("RT: $(spectrum["Rt"][peak_range[1]]) - $(spectrum["Rt"][peak_range[2]]), mass: $mass, start_index: $(peak_range[1]), end_index: $(peak_range[2])")
-		end
-
 		mass_integral[i,:] = [mass, integral]
 		
 	end
