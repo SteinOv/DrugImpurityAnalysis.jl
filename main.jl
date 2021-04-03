@@ -116,11 +116,17 @@ function mass_ratios(compound, spectra=spectra, compounds=compounds)
 
 	for i=1:length(spectra)
 		spectrum = spectra[i]["MS1"]
+		norm = mass_intensity[1, 2]
+		
+		if norm == 0
+			continue
+		end
+
 		println("Spectrum $i: \t Mass \t   Intensity     Normalised Intensity")
 
 		mass_intensity = integrate_peaks(spectrum, RT, mass_vals)
-		norm = mass_intensity[1, 2]
-		
+
+
 		for (mass, intensity) in zip(mass_intensity[:, 1], mass_intensity[:, 2])
 			@printf("\t\t%3.2f\t| %10.3E  |  %4i\n", mass, intensity, intensity/norm * 1000)
 
@@ -169,21 +175,14 @@ function integrate_peaks(spectrum, RT, mass_vals)
 	and row 2 the corresponding intensities
 	"""
 
-	# Minimum peak height, otherwise intensity is set to 0
-	noise_cutoff = 1500 # TODO Maybe determined dynamically
+	# Defines noise intensity
+	noise_cutoff = 1000 # TODO Maybe determined dynamically
 
 	max_RT_deviation = 0.08 # minutes
 	max_mass_deviation = 0.5 
 
-	# Temporarely hardcoded, for peaks close to cocaine
-	if RT >= 6.45 && RT < 6.63
-		RT_range = [RT - max_RT_deviation, RT + 0.03]
-		println("RT_range: $(RT_range)")
-	elseif RT > 6.63 && RT <= 6.75
-		RT_range = [RT - 0.03, RT + max_RT_deviation]
-	else
-		RT_range = [RT - max_RT_deviation, RT + max_RT_deviation]
-	end
+	RT_range = [RT - max_RT_deviation, RT + max_RT_deviation]
+
 	RT_range_index = RT_indices(spectrum, RT_range)
 
 	# Determine peak range based on first mass
@@ -228,8 +227,7 @@ end
 
 function find_end_of_peak(spectrum_XIC, max_intensity, max_index, direction, noise_cutoff)
 
-	current_intensity = max_intensity
-	last_intensity = 0
+	last_intensity = max_intensity
 	current_index = max_index
 	below_noise_cutoff = false
 	reached_noise = false
@@ -240,8 +238,6 @@ function find_end_of_peak(spectrum_XIC, max_intensity, max_index, direction, noi
 	history_size = 5
 	last_intensity_changes = @MVector zeros(Int64, history_size)
 
-	
-
 	i = 0
 	while current_index > 1 && current_index < (length(spectrum_XIC) - 1)
 		i = i % history_size + 1
@@ -251,7 +247,7 @@ function find_end_of_peak(spectrum_XIC, max_intensity, max_index, direction, noi
 		mean_intensity_change = (last_intensity_changes[1] + last_intensity_changes[end]) / 2
 
 		# Large intensity increase, peak overlap
-		if mean_intensity_change > 5*noise_cutoff
+		if mean_intensity_change > 20*noise_cutoff
 			peak_overlap = true
 			current_index -= (history_size - 1) * direction
 			break
