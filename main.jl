@@ -3,7 +3,7 @@ using Plots
 using Printf
 using CSV
 using DataFrames
-# using StaticArrays
+using StaticArrays
 
 # Minimum intensity of cocaine to process sample
 MIN_INTENSITY = 10^5
@@ -177,7 +177,7 @@ function integrate_peaks(spectrum, RT, mass_vals)
 	(max_intensity, max_index) = findmax(spectrum_XIC[RT_range_index[1]:RT_range_index[2]])
 	max_index += RT_range_index[1] - 1
 
-	mass_integral = zeros(Float64, length(mass_vals), 2)
+	mass_integral = @MMatrix zeros(Float64, length(mass_vals), 2)
 
 	# Below noise cutoff, set intensity to zero
 	if max_intensity < noise_cutoff
@@ -185,7 +185,7 @@ function integrate_peaks(spectrum, RT, mass_vals)
 		return mass_integral
 	end
 
-	peak_range = zeros(Int16, 2)
+	peak_range = @MVector zeros(Int16, 2)
 
 	for (j, direction) in enumerate([-1, 1])
 		peak_end = find_end_of_peak(spectrum_XIC, max_intensity, max_index, direction, noise_cutoff)
@@ -311,16 +311,16 @@ function filter_XIC(spectrum, mass)
 	filter = (spectrum["Mz_values"] .>= mass[1]) .& (spectrum["Mz_values"] .<= mass[2])
 
 	# For every scan (Rt), sum mz intensities at chosen mz values
-	spectrum_filtered = zeros(Int, size(spectrum["Mz_values"][:, 1]))
-	for i=1:length(spectrum_filtered)
+	spectrum_XIC = @MVector zeros(Int, size(spectrum["Mz_values"], 1))
+	for i=1:length(spectrum_XIC)
 		for j=1:length(filter[i, :])
 			if filter[i, j] == true
-				spectrum_filtered[i] += spectrum["Mz_intensity"][i, j]
+				spectrum_XIC[i] += spectrum["Mz_intensity"][i, j]
 			end
 		end
 	end
 
-	return spectrum_filtered
+	return spectrum_XIC
 
 end
 
