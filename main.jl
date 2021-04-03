@@ -7,6 +7,7 @@ using StaticArrays
 
 # Minimum intensity of cocaine to process sample
 MIN_INTENSITY = 10^5
+NORM_CONSTANT = 10000
 
 
 
@@ -65,7 +66,7 @@ function main()
 			# For major compound (cocaine)
 			if row[5] == -1 && intensity > MIN_INTENSITY
 				major_intensity = intensity
-				sample_profile[2] = 1000
+				sample_profile[2] = NORM_CONSTANT
 				continue
 			# Does not contain major compound (cocaine)
 			elseif row[5] == -1
@@ -73,7 +74,7 @@ function main()
 				break
 			end
 			
-			sample_profile[j + 1] = round(Int, intensity/major_intensity * 1000)
+			sample_profile[j + 1] = round(Int, intensity/major_intensity * NORM_CONSTANT)
 		end
 
 		push!(imp_profile, sample_profile)
@@ -117,7 +118,7 @@ function cocaine_normalized_list(spectra)
 			@printf("\t\t%3.2f\t| %10.3E  |  %4i\n", mass, intensity, intensity/norm)
 
 			if mass == 182.12
-				normalized_list[i] = round(Int16, intensity/norm * 1000)
+				normalized_list[i] = round(Int16, intensity/norm * NORM_CONSTANT)
 			end
 
 		end
@@ -198,6 +199,8 @@ function integrate_peaks(spectrum, RT, mass_vals)
 
 	# Integrate peak for all mz values
 	for (i, mass) in enumerate(mass_vals)
+		mass_range = [mass - max_mass_deviation, mass + max_mass_deviation]
+		spectrum_XIC = filter_XIC(spectrum, mass_range)
 		integral = sum(spectrum_XIC[peak_range[1]:peak_range[2]])
 		mass_integral[i,:] = [mass, integral]
 		
