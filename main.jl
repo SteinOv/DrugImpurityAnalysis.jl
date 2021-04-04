@@ -1,9 +1,5 @@
-using MS_Import
-using Plots
-using Printf
-using CSV
-using DataFrames
-using StaticArrays
+02
+using BenchmarkTools
 
 # Minimum intensity of cocaine to process sample
 MIN_INTENSITY = 10^5
@@ -42,6 +38,7 @@ function main()
 	# Analyse all spectra
 	sample_profile = Vector(undef, size(imp_profile, 2))
 	for i=1:length(spectra)
+
 		println("Analysing spectrum $i...")
 		spectrum = spectra[i]["MS1"]
 		sample_profile[1] = spectrum["Filename"][1]
@@ -194,7 +191,7 @@ function integrate_peaks(spectrum, RT, mass_vals)
 	(max_intensity, max_index) = findmax(spectrum_XIC[RT_range_index[1]:RT_range_index[2]])
 	max_index += RT_range_index[1] - 1
 
-	mass_integral = @MMatrix zeros(Float64, length(mass_vals), 2)
+	mass_integral = zeros(Float64, length(mass_vals), 2)
 
 	# Below noise cutoff, set intensity to zero
 	if max_intensity < noise_cutoff
@@ -213,14 +210,19 @@ function integrate_peaks(spectrum, RT, mass_vals)
 		end
 	end
 
+
 	# Integrate peak for all mz values
 	for (i, mass) in enumerate(mass_vals)
+		mass_integral[i, 1] = mass
 		mass_range = [mass - max_mass_deviation, mass + max_mass_deviation]
 		spectrum_XIC = filter_XIC(spectrum, mass_range)
-		integral = sum(spectrum_XIC[peak_range[1]:peak_range[2]])
-		mass_integral[i,:] = [mass, integral]
 		
+		integral = sum(spectrum_XIC[peak_range[1]:peak_range[2]])
+		mass_integral[i,2] = integral
+			
 	end
+
+
 
 	return mass_integral
 end
@@ -323,22 +325,19 @@ end
 
 function filter_XIC(spectrum, mass)
 	"""Returns filtered spectrum based on mass range"""
+
 	
 	# Store which indices are between mass range
-	filter = (spectrum["Mz_values"] .>= mass[1]) .& (spectrum["Mz_values"] .<= mass[2])
+	filter = findall(mz -> (mz .>= mass[1]) .& (mz .<= mass[2]), spectrum["Mz_values"])
+	filter = getindex.(filter, [1 2])
 
-	# For every scan (Rt), sum mz intensities at chosen mz values
+	# Create XIC spectrum
 	spectrum_XIC = @MVector zeros(Int, size(spectrum["Mz_values"], 1))
-	for i=1:length(spectrum_XIC)
-		for j=1:length(filter[i, :])
-			if filter[i, j] == true
-				spectrum_XIC[i] += spectrum["Mz_intensity"][i, j]
-			end
-		end
+	for (row, column) in zip(filter[:, 1], filter[:, 2])
+		spectrum_XIC[row] += spectrum["Mz_intensity"][row, column]
 	end
 
 	return spectrum_XIC
-
 end
 
 
