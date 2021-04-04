@@ -197,7 +197,7 @@ function integrate_peaks(spectrum, RT, mass_vals)
 	(max_intensity, max_index) = findmax(spectrum_XIC[RT_range_index[1]:RT_range_index[2]])
 	max_index += RT_range_index[1] - 1
 
-	mass_integral = zeros(Float64, length(mass_vals), 2)
+	mass_integral = @MMatrix zeros(Float64, length(mass_vals), 2)
 
 	# Below noise cutoff, set intensity to zero
 	if max_intensity < noise_cutoff
