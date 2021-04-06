@@ -10,6 +10,9 @@ using BenchmarkTools
 # Minimum intensity of cocaine to process sample
 MIN_INTENSITY = 10^5
 NORM_CONSTANT = 10000
+MAX_MASS_DEVIATION = 0.5
+MAX_RT_DEVIATION = 0.05
+NOISE_CUTOFF = 1000 # TODO Maybe determined dynamically
 
 
 
@@ -38,7 +41,7 @@ function main()
 	imp_profile = DataFrame()
 	insertcols!(imp_profile, :sample => String[])
 	for name in compounds[!, "compound"]
-		insertcols!(imp_profile, Symbol(name) => Int16[])
+		insertcols!(imp_profile, Symbol(name) => Int32[])
 	end
 
 	# Analyse all spectra
@@ -48,36 +51,35 @@ function main()
 		println("Analysing spectrum $i...")
 		spectrum = spectra[i]["MS1"]
 		sample_profile[1] = spectrum["Filename"][1]
-		# sample_profile = zeros(Int16, size(compounds, 1))
-		major_intensity = 0
+
+		# Determine intensity of major compound and RT shift (modifier)
+		major_intensity, RT_modifier = process_major(compounds)
+
+		# Check if major compounds sufficiently present
+		if major_intensity > MIN_INTENSITY
+			sample_profile[2] = NORM_CONSTANT
+		else
+			sample_profile[2:end] .= 0
+			push!(imp_profile, sample_profile)
+			println("Done (major compound not present)")
+			continue
+		end
 
 		# Integrate peaks of all compounds
-		for (j, row) in enumerate(eachrow(compounds))
-			compound = row[1]
-			RT = row[2]
+		for (j, row) in enumerate(eachrow(filter(row -> row.compound != major_compound_name, compounds)))
+			compound = row.compound
+			RT = row.RT * RT_modifier
 
-			mass_vals = split(row[3], ";")
+			mass_vals = split(row.mz, ";")
 			mass_vals = [parse(Float32, mass) for mass in mass_vals]
 
 			# Integrate all mz values
 			mass_integral = integrate_peaks(spectrum, RT, mass_vals)
 
-
 			# Determine final intensity for use in RT_deviation
 			intensity = determine_intensity(mass_integral)
-
-			# For major compound (cocaine)
-			if row[5] == -1 && intensity > MIN_INTENSITY
-				major_intensity = intensity
-				sample_profile[2] = NORM_CONSTANT
-				continue
-			# Does not contain major compound (cocaine)
-			elseif row[5] == -1
-				sample_profile[2:end] .= 0
-				break
-			end
 			
-			sample_profile[j + 1] = round(Int, intensity/major_intensity * NORM_CONSTANT)
+			sample_profile[j + 2] = round(Int, intensity/major_intensity * NORM_CONSTANT)
 		end
 
 		push!(imp_profile, sample_profile)
@@ -93,6 +95,40 @@ function main()
 
 
 end
+
+function process_major(compounds)
+	major_compound = filter(row -> row.type_bool == -1, compounds)
+	major_compound_name = major_compound.compound[1]
+	RT = major_compound.RT[1]
+
+	mass_vals = split(major_compound.mz[1], ";")
+	mass_vals = [parse(Float32, mass) for mass in mass_vals]
+
+	# Find peak using highest mz value within +/- 1 min of known RT
+	mass_range = [maximum(mass_vals) - MAX_MASS_DEVIATION, maximum(mass_vals) + MAX_MASS_DEVIATION]
+	RT_range = [RT - 1, RT + 1]
+	RT_range_index = [findfirst(x -> x >= RT_range[1], spectrum["Rt"]), findlast(x -> x <= RT_range[2], spectrum["Rt"])]
+	maximum_RT = findmax(filter_XIC(spectrum, mass_range)[RT_range_index[1]:RT_range_index[2]])
+	real_RT = spectrum["Rt"][maximum_RT[2] + RT_range_index[1] - 1]
+
+	# Peak below noise
+	if maximum_RT[1] < NOISE_CUTOFF
+		return (0, 0)
+	end
+
+	# Compute RT modifier
+	RT_modifier = round(real_max_RT / RT, digits = 3)
+	RT = real_max_RT
+
+	# Integrate all mz values
+	mass_integral = integrate_peaks(spectrum, RT, mass_vals)
+
+	# Determine final intensity for use in RT_deviation
+	intensity = determine_intensity(mass_integral)
+
+	return (intensity, RT_modifier)
+end
+
 
 function determine_intensity(mass_integral)
 	"""
@@ -180,19 +216,13 @@ function integrate_peaks(spectrum, RT, mass_vals)
 	and row 2 the corresponding intensities
 	"""
 
-	# Defines noise intensity
-	noise_cutoff = 1000 # TODO Maybe determined dynamically
-
-	max_RT_deviation = 0.08 # minutes
-	max_mass_deviation = 0.5 
-
-	RT_range = [RT - max_RT_deviation, RT + max_RT_deviation]
+	RT_range = [RT - MAX_RT_DEVIATION, RT + MAX_RT_DEVIATION]
 
 	RT_range_index = RT_indices(spectrum, RT_range)
 
 	# Determine peak range based on first mass
 	mass = mass_vals[1]
-	mass_range = [mass - max_mass_deviation, mass + max_mass_deviation]
+	mass_range = [mass - MAX_MASS_DEVIATION, mass + MAX_MASS_DEVIATION]
 	spectrum_XIC = filter_XIC(spectrum, mass_range)
 
 	# Determine maximum within RT and mass range
@@ -202,7 +232,7 @@ function integrate_peaks(spectrum, RT, mass_vals)
 	mass_integral = @MMatrix zeros(Float64, length(mass_vals), 2)
 
 	# Below noise cutoff, set intensity to zero
-	if max_intensity < noise_cutoff
+	if max_intensity < NOISE_CUTOFF
 		mass_integral[:, 1] .= mass_vals
 		return mass_integral
 	end
@@ -210,7 +240,7 @@ function integrate_peaks(spectrum, RT, mass_vals)
 	peak_range = @MVector zeros(Int16, 2)
 
 	for (j, direction) in enumerate([-1, 1])
-		peak_end = find_end_of_peak(spectrum_XIC, max_intensity, max_index, direction, noise_cutoff)
+		peak_end = find_end_of_peak(spectrum_XIC, max_intensity, max_index, direction)
 		peak_range[j] = peak_end[1]
 		if peak_end[2]
 			println("WARNING: Peak overlap at file: $(spectrum["Filename"][1])")
@@ -222,7 +252,7 @@ function integrate_peaks(spectrum, RT, mass_vals)
 	# Integrate peak for all mz values
 	for (i, mass) in enumerate(mass_vals)
 		mass_integral[i, 1] = mass
-		mass_range = [mass - max_mass_deviation, mass + max_mass_deviation]
+		mass_range = [mass - MAX_MASS_DEVIATION, mass + MAX_MASS_DEVIATION]
 		spectrum_XIC = filter_XIC(spectrum, mass_range)
 		
 		integral = sum(spectrum_XIC[peak_range[1]:peak_range[2]])
@@ -235,7 +265,7 @@ function integrate_peaks(spectrum, RT, mass_vals)
 	return mass_integral
 end
 
-function find_end_of_peak(spectrum_XIC, max_intensity, max_index, direction, noise_cutoff)
+function find_end_of_peak(spectrum_XIC, max_intensity, max_index, direction)
 
 	last_intensity = max_intensity
 	current_index = max_index
@@ -257,12 +287,12 @@ function find_end_of_peak(spectrum_XIC, max_intensity, max_index, direction, noi
 		mean_intensity_change = (last_intensity_changes[1] + last_intensity_changes[end]) / 2
 
 		# Large intensity increase, peak overlap
-		if mean_intensity_change > 20*noise_cutoff
+		if mean_intensity_change > 20*NOISE_CUTOFF
 			peak_overlap = true
 			current_index -= (history_size - 1) * direction
 			break
 		# Below noise cut off and intensity decreasing
-		elseif current_intensity < noise_cutoff && current_intensity < last_intensity
+		elseif current_intensity < NOISE_CUTOFF && current_intensity < last_intensity
 			below_noise_cutoff = true
 		# Below noise cut off and intensity increasing
 		elseif below_noise_cutoff && current_intensity > last_intensity
@@ -297,12 +327,11 @@ function plt(mass=0, mass2=0, RT=0, RT_deviation=0.1)
 
 	# TODO gives error at start and end
 
-	max_mass_deviation = 0.5 
 	RT_range = [RT - RT_deviation, RT + RT_deviation]
 	RT_range_index = RT_indices(spectrum, RT_range)
 
 	if mass > 0 && mass2 <= 0
-		mass_range = [mass - max_mass_deviation, mass + max_mass_deviation]
+		mass_range = [mass - MAX_MASS_DEVIATION, mass + MAX_MASS_DEVIATION]
 	elseif mass > 0
 		mass_range = [mass, mass2]
 	else
@@ -331,12 +360,12 @@ function RT_indices(spectrum, RT)
 	return [findfirst(i -> i >= RT[1], spectrum["Rt"]), findlast(i -> i <= RT[2], spectrum["Rt"])]
 end
 
-function filter_XIC(spectrum, mass)
+function filter_XIC(spectrum, mass_range)
 	"""Returns filtered spectrum based on mass range"""
 
 	
 	# Store which indices are between mass range
-	filter = findall(mz -> (mz .>= mass[1]) .& (mz .<= mass[2]), spectrum["Mz_values"])
+	filter = findall(mz -> (mz .>= mass_range[1]) .& (mz .<= mass_range[2]), spectrum["Mz_values"])
 	filter = getindex.(filter, [1 2])
 
 	# Create XIC spectrum
@@ -382,4 +411,3 @@ function batch_import(pathin)
 end
 
 main()
-
