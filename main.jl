@@ -22,7 +22,7 @@ function main()
 
 	# Specify path
 	data_folder = "P:/Git/bachelor_project/data"
-	subfolder = "mzxml"
+	subfolder = "200006"
 	pathin = joinpath(data_folder, subfolder)
 	csvout = joinpath(pathin, "impurity_profile.csv")
 
@@ -119,6 +119,8 @@ function mass_ratios(compound, spectra=spectra, compounds=compounds)
 
 	for i=1:length(spectra)
 		spectrum = spectra[i]["MS1"]
+
+		mass_intensity = integrate_peaks(spectrum, RT, mass_vals)
 		norm = mass_intensity[1, 2]
 		
 		if norm == 0
@@ -127,7 +129,7 @@ function mass_ratios(compound, spectra=spectra, compounds=compounds)
 
 		println("Spectrum $i: \t Mass \t   Intensity     Normalised Intensity")
 
-		mass_intensity = integrate_peaks(spectrum, RT, mass_vals)
+		
 
 
 		for (mass, intensity) in zip(mass_intensity[:, 1], mass_intensity[:, 2])
