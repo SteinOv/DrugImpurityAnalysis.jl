@@ -11,7 +11,7 @@ using BenchmarkTools
 MIN_INTENSITY = 10^5
 NORM_CONSTANT = 10000
 MAX_MASS_DEVIATION = 0.5
-MAX_RT_DEVIATION = 0.05
+MAX_RT_DEVIATION = 0.08
 NOISE_CUTOFF = 1000 # TODO Maybe determined dynamically
 
 
@@ -274,7 +274,7 @@ function find_end_of_peak(spectrum_XIC, max_intensity, max_index, direction)
 
 	peak_overlap = false
 
-	# For storing last intensity change
+	# For storing last intensity changes
 	history_size = 5
 	last_intensity_changes = @MVector zeros(Int64, history_size)
 
@@ -294,8 +294,8 @@ function find_end_of_peak(spectrum_XIC, max_intensity, max_index, direction)
 		# Below noise cut off and intensity decreasing
 		elseif current_intensity < NOISE_CUTOFF && current_intensity < last_intensity
 			below_noise_cutoff = true
-		# Below noise cut off and intensity increasing
-		elseif below_noise_cutoff && current_intensity > last_intensity
+		# Below noise cut off and intensity increasing or reached zero
+		elseif (below_noise_cutoff && current_intensity > last_intensity) || current_intensity <= 0
 			reached_noise = true
 			current_index -= direction
 			break
