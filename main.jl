@@ -40,8 +40,9 @@ function main()
 
 	# Create DataFrame for storing impurity profile (output)
 	imp_profile = DataFrame()
-	insertcols!(imp_profile, :filename => String[])
 	insertcols!(imp_profile, :item_number => String[])
+	insertcols!(imp_profile, :filename => String[])
+	insertcols!(imp_profile, :folder => String[])
 	for name in compounds[!, "compound"]
 		insertcols!(imp_profile, Symbol(name) => Int32[])
 	end
@@ -49,7 +50,7 @@ function main()
 	# Analyse all spectra
 	sample_profile = zeros(Int32, size(compounds, 1))
 	for i=1:length(spectra)
-		sample_metadata = Array{Any,1}(undef, 2)
+		sample_metadata = Array{Any,1}(undef, 3)
 
 		println("Analysing spectrum $i...")
 		spectrum = spectra[i]["MS1"]
@@ -57,6 +58,7 @@ function main()
 		# Save metadata
 		sample_metadata[1] = spectrum["Sample Name"][1]
 		sample_metadata[2] = spectrum["Filename"][1]
+		sample_metadata[3] = subfolder
 
 		# Determine intensity of major compound and RT shift (modifier)
 		major_intensity, RT_modifier, major_compound_name = process_major(compounds, spectrum)
@@ -313,8 +315,6 @@ function find_end_of_peak(spectrum_XIC, max_intensity, max_index, direction)
 	return current_index, peak_overlap
 end
 
-	
-
 
 function plt(mass=0, RT=0, RT_range_size=0.5)
 	"""Plot spectrum of given mass
@@ -348,6 +348,7 @@ function plt(mass=0, RT=0, RT_range_size=0.5)
 	end
 end
 
+
 function RT_indices(spectrum, RT)
 	"""Returns index range of given retention time range"""
 
@@ -361,6 +362,10 @@ end
 
 function filter_XIC(spectrum, mass)
 	"""Returns filtered spectrum based on mass range"""
+
+	if mass == 0
+		return reduce(+, spectrum["Mz_intensity"], dims=2)
+	end
 
 	mass_range = [mass - MAX_MASS_DEVIATION, mass + MAX_MASS_DEVIATION]
 	# Store which indices are between mass range
