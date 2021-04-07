@@ -4,6 +4,7 @@ using Printf
 using CSV
 using DataFrames
 using StaticArrays
+using LightXML
 
 using BenchmarkTools
 
@@ -30,8 +31,8 @@ function main()
 	csvout = joinpath(pathin, "impurity_profile.csv")
 
 	# Import spectra
-	spectra = batch_import(pathin)
-
+	time = @elapsed spectra = batch_import(pathin)
+	
 	# Import RT and mz info of valid compounds into DataFrame
 	compounds = CSV.read("compounds.csv", DataFrame)
 	filter!(row -> !(any(ismissing, (row.RT, row.mz)) || any((row.RT, row.mz) .== 0)), compounds)
@@ -39,22 +40,26 @@ function main()
 
 	# Create DataFrame for storing impurity profile (output)
 	imp_profile = DataFrame()
-	insertcols!(imp_profile, :sample => String[])
+	insertcols!(imp_profile, :filename => String[])
+	insertcols!(imp_profile, :item_number => String[])
 	for name in compounds[!, "compound"]
 		insertcols!(imp_profile, Symbol(name) => Int32[])
 	end
 
 	# Analyse all spectra
-	sample_profile = zeros(Int32, size(imp_profile, 2) - 1)
+	sample_profile = zeros(Int32, size(compounds, 1))
 	for i=1:length(spectra)
-		sample_metadata = Array{Any,1}(undef, 1)
+		sample_metadata = Array{Any,1}(undef, 2)
 
 		println("Analysing spectrum $i...")
 		spectrum = spectra[i]["MS1"]
-		sample_metadata[1] = spectrum["Filename"][1]
+
+		# Save metadata
+		sample_metadata[1] = spectrum["Sample Name"][1]
+		sample_metadata[2] = spectrum["Filename"][1]
 
 		# Determine intensity of major compound and RT shift (modifier)
-		major_intensity, RT_modifier, major_compound_name = process_major(compounds)
+		major_intensity, RT_modifier, major_compound_name = process_major(compounds, spectrum)
 
 		# Check if major compounds sufficiently present
 		if major_intensity > MIN_INTENSITY
@@ -97,7 +102,7 @@ function main()
 
 end
 
-function process_major(compounds)
+function process_major(compounds, spectrum)
 	major_compound = filter(row -> row.type_bool == -1, compounds)
 	major_compound_name = major_compound.compound[1]
 	RT = major_compound.RT[1]
@@ -108,7 +113,7 @@ function process_major(compounds)
 	# Find peak using highest mz value within +/- 1 min of known RT
 	mass = maximum(mass_vals)
 	RT_range = [RT - 1, RT + 1]
-	RT_range_index = [findfirst(x -> x >= RT_range[1], spectrum["Rt"]), findlast(x -> x <= RT_range[2], spectrum["Rt"])]
+	RT_range_index = RT_indices(spectrum, RT_range)
 	maximum_RT = findmax(filter_XIC(spectrum, mass)[RT_range_index[1]:RT_range_index[2]])
 	real_RT = spectrum["Rt"][maximum_RT[2] + RT_range_index[1] - 1]
 
@@ -311,7 +316,7 @@ end
 	
 
 
-function plt(mass=0, RT=0, RT_range_size = 0.5)
+function plt(mass=0, RT=0, RT_range_size=0.5)
 	"""Plot spectrum of given mass
 	plt((mass), (RT), (RT_deviation))
 
@@ -395,13 +400,43 @@ function batch_import(pathin)
 
 	# Load files into spectra array
 	for (i, file_index) in enumerate(supported_indices)
-		filename = [files[file_index]]
-		spectra[i] = import_files(pathin,filename,mz_thresh,Int_thresh)
-		spectra[i]["MS1"]["Filename"] = filename
+		filename = files[file_index]
+		spectra[i] = import_files(pathin,[filename],mz_thresh,Int_thresh)
+		spectra[i]["MS1"]["Filename"] = [filename]
+		spectra[i]["MS1"]["Sample Name"] = [retrieve_sample_name(pathin, filename)]
+		
+
 		println("Read spectra $(i[1]) of $num_of_spectra")
 	end
 
 	return spectra
 end
+
+function retrieve_sample_name(pathin, filename)
+	# Path to xml file which contains Sample Name
+	folder_name = filename[begin:end-5] * "D"
+	folder_loc = joinpath(pathin, folder_name)
+	sample_info_file = joinpath(folder_loc, "AcqData\\sample_info.xml")
+
+	# File does not exist
+	if !isfile(sample_info_file)
+		return ""
+	end
+
+	# Load xml file into array
+	xdoc = parse_file(sample_info_file)
+	xroot = root(xdoc)
+	xarray = xroot["Field"]
+
+	# Find index where Sample Name is stored and retrieve its value
+	element_index = findfirst(i -> content(find_element(i, "Name")) == "Sample Name", xarray)
+	sample_name = content(find_element(xarray[element_index], "Value"))
+
+	# Free memory
+	free(xdoc)
+
+	return sample_name
+end
+
 
 main()
