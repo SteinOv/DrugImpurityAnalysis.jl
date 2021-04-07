@@ -106,10 +106,10 @@ function process_major(compounds)
 	mass_vals = [parse(Float32, mass) for mass in mass_vals]
 
 	# Find peak using highest mz value within +/- 1 min of known RT
-	mass_range = [maximum(mass_vals) - MAX_MASS_DEVIATION, maximum(mass_vals) + MAX_MASS_DEVIATION]
+	mass = maximum(mass_vals)
 	RT_range = [RT - 1, RT + 1]
 	RT_range_index = [findfirst(x -> x >= RT_range[1], spectrum["Rt"]), findlast(x -> x <= RT_range[2], spectrum["Rt"])]
-	maximum_RT = findmax(filter_XIC(spectrum, mass_range)[RT_range_index[1]:RT_range_index[2]])
+	maximum_RT = findmax(filter_XIC(spectrum, mass)[RT_range_index[1]:RT_range_index[2]])
 	real_RT = spectrum["Rt"][maximum_RT[2] + RT_range_index[1] - 1]
 
 	# Peak below noise
@@ -223,8 +223,7 @@ function integrate_peaks(spectrum, RT, mass_vals)
 
 	# Determine peak range based on first mass
 	mass = mass_vals[1]
-	mass_range = [mass - MAX_MASS_DEVIATION, mass + MAX_MASS_DEVIATION]
-	spectrum_XIC = filter_XIC(spectrum, mass_range)
+	spectrum_XIC = filter_XIC(spectrum, mass)
 
 	# Determine maximum within RT and mass range
 	(max_intensity, max_index) = findmax(spectrum_XIC[RT_range_index[1]:RT_range_index[2]])
@@ -253,8 +252,7 @@ function integrate_peaks(spectrum, RT, mass_vals)
 	# Integrate peak for all mz values
 	for (i, mass) in enumerate(mass_vals)
 		mass_integral[i, 1] = mass
-		mass_range = [mass - MAX_MASS_DEVIATION, mass + MAX_MASS_DEVIATION]
-		spectrum_XIC = filter_XIC(spectrum, mass_range)
+		spectrum_XIC = filter_XIC(spectrum, mass)
 		
 		integral = sum(spectrum_XIC[peak_range[1]:peak_range[2]])
 		mass_integral[i,2] = integral
@@ -313,38 +311,33 @@ end
 	
 
 
-function plt(mass=0, mass2=0, RT=0, RT_deviation=0.1)
+function plt(mass=0, RT=0, RT_range_size = 0.5)
 	"""Plot spectrum of given mass
-	plt((mass), (mass2), (RT), (RT_deviation))
+	plt((mass), (RT), (RT_deviation))
 
-	only mass given: XIC at specific mass
-	mass and mass2: XIC between range
+	mass: XIC at specific mass
 	mass = 0: Spectrum not filtered
 
 	RT given: Zooms in around given RT
 	RT = 0: Shows complete RT spectrum
-	RT_deviation: Deviation around RT (default 0.1)
+	RT_range_size: Deviation around RT (default 0.5)
 	"""
 
 	# TODO gives error at start and end
 
-	RT_range = [RT - RT_deviation, RT + RT_deviation]
+	RT_range = [RT - RT_range_size, RT + RT_range_size]
 	RT_range_index = RT_indices(spectrum, RT_range)
 
-	if mass > 0 && mass2 <= 0
-		mass_range = [mass - MAX_MASS_DEVIATION, mass + MAX_MASS_DEVIATION]
-	elseif mass > 0
-		mass_range = [mass, mass2]
+	if mass > 0
+		spectrum_XIC = filter_XIC(spectrum, mass)
 	else
-		mass_range = [0, Inf]
+		spectrum_XIC = spectrum["Mz_intensity"]
 	end
-
-	spectrum_XIC = filter_XIC(spectrum, mass_range)
 
 	if RT > 0
 		add_left = 100
 		add_right = 100
-		plot(spectrum["Rt"][RT_range_index[1] - add_left:RT_range_index[2] + add_right], spectrum_XIC[(RT_range_index[1] - add_left):(RT_range_index[2] + add_right)])
+		plot(spectrum["Rt"][RT_range_index[1]:RT_range_index[2]], spectrum_XIC[(RT_range_index[1]):RT_range_index[2]])
 	else
 		plot(spectrum["Rt"], spectrum_XIC)
 	end
@@ -361,10 +354,10 @@ function RT_indices(spectrum, RT)
 	return [findfirst(i -> i >= RT[1], spectrum["Rt"]), findlast(i -> i <= RT[2], spectrum["Rt"])]
 end
 
-function filter_XIC(spectrum, mass_range)
+function filter_XIC(spectrum, mass)
 	"""Returns filtered spectrum based on mass range"""
 
-	
+	mass_range = [mass - MAX_MASS_DEVIATION, mass + MAX_MASS_DEVIATION]
 	# Store which indices are between mass range
 	filter = findall(mz -> (mz .>= mass_range[1]) .& (mz .<= mass_range[2]), spectrum["Mz_values"])
 	filter = getindex.(filter, [1 2])
