@@ -32,7 +32,7 @@ function main()
 
 	# Import spectra
 	time = @elapsed spectra = batch_import(pathin)
-	
+
 	# Import RT and mz info of valid compounds into DataFrame
 	compounds = CSV.read("compounds.csv", DataFrame)
 	filter!(row -> !(any(ismissing, (row.RT, row.mz)) || any((row.RT, row.mz) .== 0)), compounds)
@@ -336,7 +336,7 @@ function plt(mass=0, RT=0, RT_range_size=0.5)
 	if mass > 0
 		spectrum_XIC = filter_XIC(spectrum, mass)
 	else
-		spectrum_XIC = spectrum["Mz_intensity"]
+		spectrum_XIC = filter_XIC(spectrum, 0)
 	end
 
 	if RT > 0
