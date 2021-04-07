@@ -8,11 +8,11 @@ using StaticArrays
 using BenchmarkTools
 
 # Minimum intensity of cocaine to process sample
-MIN_INTENSITY = 10^5
-NORM_CONSTANT = 10000
-MAX_MASS_DEVIATION = 0.5
-MAX_RT_DEVIATION = 0.08
-NOISE_CUTOFF = 1000 # TODO Maybe determined dynamically
+const MIN_INTENSITY = 10^5
+const NORM_CONSTANT = 10000
+const MAX_MASS_DEVIATION = 0.5
+const MAX_RT_DEVIATION = 0.08
+const NOISE_CUTOFF = 1000 # TODO Maybe determined dynamically
 
 
 
@@ -45,22 +45,23 @@ function main()
 	end
 
 	# Analyse all spectra
-	sample_profile = Vector(undef, size(imp_profile, 2))
+	sample_profile = zeros(Int32, size(imp_profile, 2) - 1)
 	for i=1:length(spectra)
+		sample_metadata = Array{Any,1}(undef, 1)
 
 		println("Analysing spectrum $i...")
 		spectrum = spectra[i]["MS1"]
-		sample_profile[1] = spectrum["Filename"][1]
+		sample_metadata[1] = spectrum["Filename"][1]
 
 		# Determine intensity of major compound and RT shift (modifier)
-		major_intensity, RT_modifier = process_major(compounds)
+		major_intensity, RT_modifier, major_compound_name = process_major(compounds)
 
 		# Check if major compounds sufficiently present
 		if major_intensity > MIN_INTENSITY
-			sample_profile[2] = NORM_CONSTANT
+			sample_profile[1] = NORM_CONSTANT
 		else
-			sample_profile[2:end] .= 0
-			push!(imp_profile, sample_profile)
+			sample_profile[:] .= 0
+			push!(imp_profile, append!(sample_metadata, sample_profile))
 			println("Done (major compound not present)")
 			continue
 		end
@@ -79,10 +80,10 @@ function main()
 			# Determine final intensity for use in RT_deviation
 			intensity = determine_intensity(mass_integral)
 			
-			sample_profile[j + 2] = round(Int, intensity/major_intensity * NORM_CONSTANT)
+			sample_profile[j + 1] = round(Int, intensity/major_intensity * NORM_CONSTANT)
 		end
 
-		push!(imp_profile, sample_profile)
+		push!(imp_profile, append!(sample_metadata, sample_profile))
 		println("Done")
 	end
 
@@ -113,12 +114,12 @@ function process_major(compounds)
 
 	# Peak below noise
 	if maximum_RT[1] < NOISE_CUTOFF
-		return (0, 0)
+		return (0, 0, major_compound_name)
 	end
 
 	# Compute RT modifier
-	RT_modifier = round(real_max_RT / RT, digits = 3)
-	RT = real_max_RT
+	RT_modifier = round(real_RT / RT, digits = 3)
+	RT = real_RT
 
 	# Integrate all mz values
 	mass_integral = integrate_peaks(spectrum, RT, mass_vals)
@@ -126,7 +127,7 @@ function process_major(compounds)
 	# Determine final intensity for use in RT_deviation
 	intensity = determine_intensity(mass_integral)
 
-	return (intensity, RT_modifier)
+	return (intensity, RT_modifier, major_compound_name)
 end
 
 
