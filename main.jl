@@ -163,10 +163,14 @@ function mass_ratios(compound, spectra=spectra, compounds=compounds)
 
 	for i=1:length(spectra)
 		spectrum = spectra[i]["MS1"]
+		RT_modifier = process_major(compounds, spectrum)[2]
 
-		mass_intensity = integrate_peaks(spectrum, RT, mass_vals)
+		if RT_modifier == 0
+			continue
+		end
+		mass_intensity = integrate_peaks(spectrum, RT * RT_modifier, mass_vals)
 		norm = mass_intensity[1, 2]
-		
+
 		if norm == 0
 			continue
 		end
@@ -348,6 +352,38 @@ function plt(mass=0, RT=0, RT_range_size=0.5)
 	end
 end
 
+function plt!(mass=0, RT=0, RT_range_size=0.5)
+	"""Plot spectrum of given mass
+	plt((mass), (RT), (RT_deviation))
+
+	mass: XIC at specific mass
+	mass = 0: Spectrum not filtered
+
+	RT given: Zooms in around given RT
+	RT = 0: Shows complete RT spectrum
+	RT_range_size: Deviation around RT (default 0.5)
+	"""
+
+	# TODO gives error at start and end
+
+	RT_range = [RT - RT_range_size, RT + RT_range_size]
+	RT_range_index = RT_indices(spectrum, RT_range)
+
+	if mass > 0
+		spectrum_XIC = filter_XIC(spectrum, mass)
+	else
+		spectrum_XIC = filter_XIC(spectrum, 0)
+	end
+
+	if RT > 0
+		add_left = 100
+		add_right = 100
+		plot!(spectrum["Rt"][RT_range_index[1]:RT_range_index[2]], spectrum_XIC[(RT_range_index[1]):RT_range_index[2]])
+	else
+		plot!(spectrum["Rt"], spectrum_XIC)
+	end
+end
+
 
 function RT_indices(spectrum, RT)
 	"""Returns index range of given retention time range"""
@@ -362,6 +398,12 @@ end
 
 function filter_XIC(spectrum, mass)
 	"""Returns filtered spectrum based on mass range"""
+	# mass_test = (82, 182)
+	# x = 82.5
+	# map(abs(), mass)
+	# minimum([temp .= mass_test - x])
+	# reduce((x,y)->x[2]<y[2]?x:y,(0,1000),map((x,y)->(x,abs(y-8.22)),1:length(x),x))
+	# searchsorted()
 
 	if mass == 0
 		return reduce(+, spectrum["Mz_intensity"], dims=2)
@@ -444,4 +486,4 @@ function retrieve_sample_name(pathin, filename)
 end
 
 
-main()
+# main()
