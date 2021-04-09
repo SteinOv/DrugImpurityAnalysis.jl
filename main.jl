@@ -65,7 +65,7 @@ function main()
 			major_intensity, RT_modifier, major_compound_name = process_major(compounds, spectrum)
 
 			# Check if major compounds sufficiently present
-			if major_intensity > MIN_INTENSITY
+			if major_intensity > 0
 				sample_profile[1] = NORM_CONSTANT
 			else
 				sample_profile[:] .= 0
@@ -106,6 +106,7 @@ function main()
 end
 
 function process_major(compounds, spectrum)
+	"""Returns intensity of major compound, RT modifier (for RT shift correction) and name of major compound"""
 	major_compound = filter(row -> row.type_bool == -1, compounds)
 	major_compound_name = major_compound.compound[1]
 	RT = major_compound.RT[1]
@@ -114,10 +115,10 @@ function process_major(compounds, spectrum)
 	mass_vals = [parse(Float32, mass) for mass in mass_vals]
 
 	# Find peak using highest mz value within +/- 1 min of known RT
-	mass = maximum(mass_vals)
+	highest_mass = maximum(mass_vals)
 	RT_range = [RT - 1, RT + 1]
 	RT_range_index = RT_indices(spectrum, RT_range)
-	maximum_RT = findmax(filter_XIC(spectrum, mass)[RT_range_index[1]:RT_range_index[2]])
+	maximum_RT = findmax(filter_XIC(spectrum, highest_mass)[RT_range_index[1]:RT_range_index[2]])
 	real_RT = spectrum["Rt"][maximum_RT[2] + RT_range_index[1] - 1]
 
 	# Peak below noise
@@ -132,8 +133,16 @@ function process_major(compounds, spectrum)
 	# Integrate all mz values
 	mass_integral = integrate_peaks(spectrum, RT, mass_vals)
 
+	highest_mass_i = findfirst(x -> x == highest_mass, mass_integral[:, 1])
+	hi_mz_intensity = mass_integral[highest_mass_i, 2]
+	if hi_mz_intensity < MIN_INTENSITY
+		return (0, 0, major_compound_name)
+	end
+
 	# Determine final intensity for use in RT_deviation
 	intensity = determine_intensity(mass_integral)
+
+	
 
 	return (intensity, RT_modifier, major_compound_name)
 end
