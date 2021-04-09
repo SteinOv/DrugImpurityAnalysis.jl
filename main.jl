@@ -31,69 +31,70 @@ function main()
 	csvout = joinpath(pathin, "impurity_profile.csv")
 
 	# Import spectra
-	time = @elapsed spectra = batch_import(pathin)
+	load_time = @elapsed spectra = batch_import(pathin)
+	
+	# @btime begin #  3.168 s (7339762 allocations: 277.15 MiB)
+		# Import RT and mz info of valid compounds into DataFrame
+		compounds = CSV.read("compounds.csv", DataFrame)
+		filter!(row -> !(any(ismissing, (row.RT, row.mz)) || any((row.RT, row.mz) .== 0)), compounds)
 
-	# Import RT and mz info of valid compounds into DataFrame
-	compounds = CSV.read("compounds.csv", DataFrame)
-	filter!(row -> !(any(ismissing, (row.RT, row.mz)) || any((row.RT, row.mz) .== 0)), compounds)
 
+		# Create DataFrame for storing impurity profile (output)
+		imp_profile = DataFrame()
+		insertcols!(imp_profile, :item_number => String[])
+		insertcols!(imp_profile, :filename => String[])
+		insertcols!(imp_profile, :folder => String[])
+		for name in compounds[!, "compound"]
+			insertcols!(imp_profile, Symbol(name) => Int32[])
+		end
 
-	# Create DataFrame for storing impurity profile (output)
-	imp_profile = DataFrame()
-	insertcols!(imp_profile, :item_number => String[])
-	insertcols!(imp_profile, :filename => String[])
-	insertcols!(imp_profile, :folder => String[])
-	for name in compounds[!, "compound"]
-		insertcols!(imp_profile, Symbol(name) => Int32[])
-	end
+		# Analyse all spectra
+		sample_profile = zeros(Int32, size(compounds, 1))
+		for i=1:length(spectra)
+			sample_metadata = Array{Any,1}(undef, 3)
 
-	# Analyse all spectra
-	sample_profile = zeros(Int32, size(compounds, 1))
-	for i=1:length(spectra)
-		sample_metadata = Array{Any,1}(undef, 3)
+			println("Analysing spectrum $i...")
+			spectrum = spectra[i]["MS1"]
 
-		println("Analysing spectrum $i...")
-		spectrum = spectra[i]["MS1"]
+			# Save metadata
+			sample_metadata[1] = spectrum["Sample Name"][1]
+			sample_metadata[2] = spectrum["Filename"][1]
+			sample_metadata[3] = subfolder
 
-		# Save metadata
-		sample_metadata[1] = spectrum["Sample Name"][1]
-		sample_metadata[2] = spectrum["Filename"][1]
-		sample_metadata[3] = subfolder
+			# Determine intensity of major compound and RT shift (modifier)
+			major_intensity, RT_modifier, major_compound_name = process_major(compounds, spectrum)
 
-		# Determine intensity of major compound and RT shift (modifier)
-		major_intensity, RT_modifier, major_compound_name = process_major(compounds, spectrum)
+			# Check if major compounds sufficiently present
+			if major_intensity > MIN_INTENSITY
+				sample_profile[1] = NORM_CONSTANT
+			else
+				sample_profile[:] .= 0
+				push!(imp_profile, append!(sample_metadata, sample_profile))
+				println("Done (major compound not present)")
+				continue
+			end
 
-		# Check if major compounds sufficiently present
-		if major_intensity > MIN_INTENSITY
-			sample_profile[1] = NORM_CONSTANT
-		else
-			sample_profile[:] .= 0
+			# Integrate peaks of all compounds
+			for (j, row) in enumerate(eachrow(filter(row -> row.compound != major_compound_name, compounds)))
+				compound = row.compound
+				RT = row.RT * RT_modifier
+
+				mass_vals = split(row.mz, ";")
+				mass_vals = [parse(Float32, mass) for mass in mass_vals]
+
+				# Integrate all mz values
+				mass_integral = integrate_peaks(spectrum, RT, mass_vals)
+
+				# Determine final intensity for use in RT_deviation
+				intensity = determine_intensity(mass_integral)
+				
+				sample_profile[j + 1] = round(Int, intensity/major_intensity * NORM_CONSTANT)
+			end
+
 			push!(imp_profile, append!(sample_metadata, sample_profile))
-			println("Done (major compound not present)")
-			continue
+			println("Done")
 		end
-
-		# Integrate peaks of all compounds
-		for (j, row) in enumerate(eachrow(filter(row -> row.compound != major_compound_name, compounds)))
-			compound = row.compound
-			RT = row.RT * RT_modifier
-
-			mass_vals = split(row.mz, ";")
-			mass_vals = [parse(Float32, mass) for mass in mass_vals]
-
-			# Integrate all mz values
-			mass_integral = integrate_peaks(spectrum, RT, mass_vals)
-
-			# Determine final intensity for use in RT_deviation
-			intensity = determine_intensity(mass_integral)
-			
-			sample_profile[j + 1] = round(Int, intensity/major_intensity * NORM_CONSTANT)
-		end
-
-		push!(imp_profile, append!(sample_metadata, sample_profile))
-		println("Done")
-	end
-
+	# end
 	CSV.write(csvout, imp_profile)
 
 
@@ -337,7 +338,7 @@ function plt(mass=0, RT=0, RT_range_size=0.5)
 	RT_range = [RT - RT_range_size, RT + RT_range_size]
 	RT_range_index = RT_indices(spectrum, RT_range)
 
-	if mass > 0
+	if mass != 0
 		spectrum_XIC = filter_XIC(spectrum, mass)
 	else
 		spectrum_XIC = filter_XIC(spectrum, 0)
@@ -369,7 +370,7 @@ function plt!(mass=0, RT=0, RT_range_size=0.5)
 	RT_range = [RT - RT_range_size, RT + RT_range_size]
 	RT_range_index = RT_indices(spectrum, RT_range)
 
-	if mass > 0
+	if mass != 0
 		spectrum_XIC = filter_XIC(spectrum, mass)
 	else
 		spectrum_XIC = filter_XIC(spectrum, 0)
@@ -396,28 +397,33 @@ function RT_indices(spectrum, RT)
 	return [findfirst(i -> i >= RT[1], spectrum["Rt"]), findlast(i -> i <= RT[2], spectrum["Rt"])]
 end
 
-function filter_XIC(spectrum, mass)
-	"""Returns filtered spectrum based on mass range"""
-	# mass_test = (82, 182)
-	# x = 82.5
-	# map(abs(), mass)
-	# minimum([temp .= mass_test - x])
-	# reduce((x,y)->x[2]<y[2]?x:y,(0,1000),map((x,y)->(x,abs(y-8.22)),1:length(x),x))
-	# searchsorted()
+function filter_XIC(spectrum, mass_values)
+	"""Returns filtered spectrum based on given mass (mz) values"""
 
-	if mass == 0
+	# Return complete spectrum
+	if mass_values == 0
 		return reduce(+, spectrum["Mz_intensity"], dims=2)
+	# Convert to tuple
+	elseif typeof(mass_values) == Int
+		mass_values = (mass_values,)
 	end
 
-	mass_range = [mass - MAX_MASS_DEVIATION, mass + MAX_MASS_DEVIATION]
-	# Store which indices are between mass range
-	filter = findall(mz -> (mz .>= mass_range[1]) .& (mz .<= mass_range[2]), spectrum["Mz_values"])
-	filter = getindex.(filter, [1 2])
+	indices = Array{CartesianIndex{2}, 1}()
+
+	# Add indices that correspond to given mz values
+	for mass in mass_values
+		mass_range = [mass - MAX_MASS_DEVIATION, mass + MAX_MASS_DEVIATION]
+
+		# Store which indices are between mass range
+		append!(indices, findall(mz -> (mz .>= mass_range[1]) .& (mz .<= mass_range[2]), spectrum["Mz_values"]))
+	end
 
 	# Create XIC spectrum
 	spectrum_XIC = @MVector zeros(Int, size(spectrum["Mz_values"], 1))
-	for (row, column) in zip(filter[:, 1], filter[:, 2])
-		spectrum_XIC[row] += spectrum["Mz_intensity"][row, column]
+
+	# Filter spectrum using stored indices
+	for I in indices
+		spectrum_XIC[I[1]] += spectrum["Mz_intensity"][I]
 	end
 
 	return spectrum_XIC
