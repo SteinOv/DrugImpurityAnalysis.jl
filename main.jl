@@ -44,7 +44,7 @@ function main()
 		insertcols!(imp_profile, :item_number => String[])
 		insertcols!(imp_profile, :filename => String[])
 		insertcols!(imp_profile, :folder => String[])
-		for name in compounds[!, "compound"]
+		for name in filter(row -> !(row.type_int == -10), compounds).compound
 			insertcols!(imp_profile, Symbol(name) => Int32[])
 		end
 
@@ -75,7 +75,7 @@ function main()
 			end
 
 			# Integrate peaks of all compounds
-			for (j, row) in enumerate(eachrow(filter(row -> row.compound != major_compound_name, compounds)))
+			for (j, row) in enumerate(eachrow(filter(row -> !(row.type_int in [-1, -10]), compounds)))
 				compound = row.compound
 				RT = row.RT * RT_modifier
 
@@ -88,7 +88,7 @@ function main()
 				# Determine final intensity for use in RT_deviation
 				intensity = determine_intensity(mass_integral)
 				
-				sample_profile[j + 1] = round(Int, intensity/major_intensity * NORM_CONSTANT)
+				sample_profile[j + 1] = round(Int, intensity/major_intensity * NORM_CONSTANT) # TODO 2 is a magic number (corresponds to number major compounds)
 			end
 
 			push!(imp_profile, append!(sample_metadata, sample_profile))
@@ -107,12 +107,18 @@ end
 
 function process_major(compounds, spectrum)
 	"""Returns intensity of major compound, RT modifier (for RT shift correction) and name of major compound"""
-	major_compound = filter(row -> row.type_bool == -1, compounds)
+	major_compound = filter(row -> row.type_int == -1, compounds)
+	internal_standard = filter(row -> row.type_int == -10, compounds)
+
 	major_compound_name = major_compound.compound[1]
 	RT = major_compound.RT[1]
+	IS_RT = internal_standard.RT[1]
+	IS_major_ratio = parse(Float32, internal_standard.ratio[1])[1]
 
 	mass_vals = split(major_compound.mz[1], ";")
 	mass_vals = [parse(Float32, mass) for mass in mass_vals]
+	IS_mass_vals = split(internal_standard.mz[1], ";")
+	IS_mass_vals = [parse(Float32, mass) for mass in IS_mass_vals]
 
 	# Find peak using highest mz value within +/- 1 min of known RT
 	highest_mass = maximum(mass_vals)
@@ -130,12 +136,16 @@ function process_major(compounds, spectrum)
 	RT_modifier = round(real_RT / RT, digits = 3)
 	RT = real_RT
 
+	IS_RT = IS_RT * RT_modifier
+	IS_integral = integrate_peaks(spectrum, IS_RT, IS_mass_vals[1])[1, 2]
+
 	# Integrate all mz values
 	mass_integral = integrate_peaks(spectrum, RT, mass_vals)
 
+	# Ratio between first mz IS and biggest mass major compound is defined in compounds.csv
 	highest_mass_i = findfirst(x -> x == highest_mass, mass_integral[:, 1])
 	hi_mz_intensity = mass_integral[highest_mass_i, 2]
-	if hi_mz_intensity < MIN_INTENSITY
+	if IS_integral / hi_mz_intensity > IS_major_ratio
 		return (0, 0, major_compound_name)
 	end
 
@@ -202,10 +212,10 @@ function mass_ratios(compound, spectra=spectra, compounds=compounds)
 		println("----------------------------")
 	end
 
-	println("Normalized list second mass:")
-	for i in normalized_list
-		@printf("%4i\n", i)
-	end
+	# println("Normalized list second mass:")
+	# for i in normalized_list
+	# 	@printf("%4i\n", i)
+	# end
 
 end
 
