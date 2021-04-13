@@ -40,16 +40,17 @@ function main()
 
 
 		# Create DataFrame for storing impurity profile (output)
+		compounds_in_prof = filter(row -> !(row.type_int == -10), compounds)
 		imp_profile = DataFrame()
 		insertcols!(imp_profile, :item_number => String[])
 		insertcols!(imp_profile, :filename => String[])
 		insertcols!(imp_profile, :folder => String[])
-		for name in filter(row -> !(row.type_int == -10), compounds).compound
+		for name in compounds_in_prof.compound
 			insertcols!(imp_profile, Symbol(name) => Int32[])
 		end
 
 		# Analyse all spectra
-		sample_profile = zeros(Int32, size(compounds, 1))
+		sample_profile = zeros(Int32, size(compounds_in_prof, 1))
 		for i=1:length(spectra)
 			sample_metadata = Array{Any,1}(undef, 3)
 
@@ -88,7 +89,7 @@ function main()
 				# Determine final intensity for use in RT_deviation
 				intensity = determine_intensity(mass_integral)
 				
-				sample_profile[j + 1] = round(Int, intensity/major_intensity * NORM_CONSTANT) # TODO 2 is a magic number (corresponds to number major compounds)
+				sample_profile[j + 1] = round(Int, intensity/major_intensity * NORM_CONSTANT)
 			end
 
 			push!(imp_profile, append!(sample_metadata, sample_profile))
@@ -98,8 +99,8 @@ function main()
 	CSV.write(csvout, imp_profile)
 
 
-	# spectrum = spectra[4]["MS1"]
-
+	# spectrum = spectra[3]["MS1"]
+	# plt(303)
 
 
 
@@ -142,9 +143,11 @@ function process_major(compounds, spectrum)
 	# Integrate all mz values
 	mass_integral = integrate_peaks(spectrum, RT, mass_vals)
 
-	# Ratio between first mz IS and biggest mass major compound is defined in compounds.csv
+	# Required ratio between first mz IS and biggest mass major compound is defined in compounds.csv
 	highest_mass_i = findfirst(x -> x == highest_mass, mass_integral[:, 1])
 	hi_mz_intensity = mass_integral[highest_mass_i, 2]
+
+	# Ratio to high, no significant amount of major compound present
 	if IS_integral / hi_mz_intensity > IS_major_ratio
 		return (0, 0, major_compound_name)
 	end
@@ -510,5 +513,32 @@ function retrieve_sample_name(pathin, filename)
 	return sample_name
 end
 
+function determine_noise(spectrum_part)
+	"""Returns median of noise or -1 if peak detected"""
+	# spectrum_part = [0, 100, 0, 100, 100, 0]
+
+	# More than 80% zeros, noise level of 0
+	if count(x -> x == 0, spectrum_part) / length(spectrum_part) > 0.8 # TODO maybe global?
+		return 0
+	end
+
+	spectr_median = median(spectrum_part)
+
+	# Count number of median crossings
+	crossings_count = 0
+	for i in 2:length(spectrum_part)
+		crosses_median = (spectrum_part[i] - spectr_median) * (spectrum_part[i - 1] - spectr_median) <= 0
+		if crosses_median
+			crossings_count += 1
+		end
+	end
+
+	# Fraction of crossings is smaller than 20%, peak instead of noise
+	if crossings_count / length(spectrum_part) < 0.2 # TODO maybe global?
+		return -1
+	else
+		return spectr_median
+
 
 # main()
+
