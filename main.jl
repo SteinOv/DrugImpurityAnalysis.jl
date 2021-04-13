@@ -8,6 +8,9 @@ using LightXML
 
 using BenchmarkTools
 
+include("manual_visualisation.jl")
+include("helpers.jl")
+
 # Minimum intensity of cocaine to process sample
 const MIN_INTENSITY = 10^5
 const NORM_CONSTANT = 10000
@@ -147,7 +150,7 @@ function process_major(compounds, spectrum)
 	highest_mass_i = findfirst(x -> x == highest_mass, mass_integral[:, 1])
 	hi_mz_intensity = mass_integral[highest_mass_i, 2]
 
-	# Ratio to high, no significant amount of major compound present
+	# Ratio too high, no significant amount of major compound present
 	if IS_integral / hi_mz_intensity > IS_major_ratio
 		return (0, 0, major_compound_name)
 	end
@@ -170,70 +173,7 @@ function determine_intensity(mass_integral)
 end
 
 
-# TEMPORARY
-function mass_ratios(compound, spectra=spectra, compounds=compounds)
-"""Print intensities of mz peaks of specific compound for each spectrum"""
 
-
-	compound_row = findfirst(comp -> comp == compound, compounds.compound)
-
-	normalized_list = zeros(Int16, length(spectra))
-
-	row = compounds[compound_row, :]
-	mass_vals = split(row[3], ";")
-	mass_vals = [parse(Float32, mass) for mass in mass_vals]
-	RT = row[2]
-
-	for i=1:length(spectra)
-		spectrum = spectra[i]["MS1"]
-		RT_modifier = process_major(compounds, spectrum)[2]
-
-		if RT_modifier == 0
-			continue
-		end
-		mass_intensity = integrate_peaks(spectrum, RT * RT_modifier, mass_vals)
-		norm = mass_intensity[1, 2]
-
-		if norm == 0
-			continue
-		end
-
-		println("Spectrum $i: \t Mass \t   Intensity     Normalised Intensity")
-
-		
-
-
-		for (mass, intensity) in zip(mass_intensity[:, 1], mass_intensity[:, 2])
-			@printf("\t\t%3.2f\t| %10.3E  |  %4i\n", mass, intensity, intensity/norm * 1000)
-
-			if mass == mass_vals[1]
-				normalized_list[i] = round(Int16, intensity/norm * 1000)
-			end
-
-		end
-
-		println("----------------------------")
-	end
-
-	# println("Normalized list second mass:")
-	# for i in normalized_list
-	# 	@printf("%4i\n", i)
-	# end
-
-end
-
-
-# TEMPORARY
-function cocaine_intensity(spectrum)
-	"""Returns intensity of cocaine peak if present, else 0"""
-
-	# Cocaine approximate peak locations
-	RT = 6.66 # minutes
-	mass_vals = [82.07, 182.12, 83.07, 94.07, 77.04, 105.03, 96.08, 42.03, 303.15]
-	
-	return integrate_peaks(spectrum, RT, mass_vals)
-
-end
 
 
 """
@@ -343,179 +283,11 @@ function find_end_of_peak(spectrum_XIC, max_intensity, max_index, direction)
 end
 
 
-function plt(mass=0, RT=0, RT_range_size=0.5)
-	"""Plot spectrum of given mass
-	plt((mass), (RT), (RT_deviation))
 
-	mass: XIC at specific mass
-	mass = 0: Spectrum not filtered
-
-	RT given: Zooms in around given RT
-	RT = 0: Shows complete RT spectrum
-	RT_range_size: Deviation around RT (default 0.5)
-	"""
-
-	# TODO gives error at start and end
-
-	RT_range = [RT - RT_range_size, RT + RT_range_size]
-	RT_range_index = RT_indices(spectrum, RT_range)
-
-	if mass != 0
-		spectrum_XIC = filter_XIC(spectrum, mass)
-	else
-		spectrum_XIC = filter_XIC(spectrum, 0)
-	end
-
-	if RT > 0
-		add_left = 100
-		add_right = 100
-		plot(spectrum["Rt"][RT_range_index[1]:RT_range_index[2]], spectrum_XIC[(RT_range_index[1]):RT_range_index[2]])
-	else
-		plot(spectrum["Rt"], spectrum_XIC)
-	end
-end
-
-function plt!(mass=0, RT=0, RT_range_size=0.5)
-	"""Plot spectrum of given mass
-	plt((mass), (RT), (RT_deviation))
-
-	mass: XIC at specific mass
-	mass = 0: Spectrum not filtered
-
-	RT given: Zooms in around given RT
-	RT = 0: Shows complete RT spectrum
-	RT_range_size: Deviation around RT (default 0.5)
-	"""
-
-	# TODO gives error at start and end
-
-	RT_range = [RT - RT_range_size, RT + RT_range_size]
-	RT_range_index = RT_indices(spectrum, RT_range)
-
-	if mass != 0
-		spectrum_XIC = filter_XIC(spectrum, mass)
-	else
-		spectrum_XIC = filter_XIC(spectrum, 0)
-	end
-
-	if RT > 0
-		add_left = 100
-		add_right = 100
-		plot!(spectrum["Rt"][RT_range_index[1]:RT_range_index[2]], spectrum_XIC[(RT_range_index[1]):RT_range_index[2]])
-	else
-		plot!(spectrum["Rt"], spectrum_XIC)
-	end
-end
-
-
-function RT_indices(spectrum, RT)
-	"""Returns index range of given retention time range"""
-
-	# Only possible if Rt is sorted
-	if !issorted(spectrum["Rt"])
-		error("Error: Retention time array is not in order")
-	end
-	
-	return [findfirst(i -> i >= RT[1], spectrum["Rt"]), findlast(i -> i <= RT[2], spectrum["Rt"])]
-end
-
-function filter_XIC(spectrum, mass_values)
-	"""Returns filtered spectrum based on given mass (mz) values"""
-
-	# Return complete spectrum
-	if mass_values == 0
-		return reduce(+, spectrum["Mz_intensity"], dims=2)
-	# Convert to tuple
-	elseif typeof(mass_values) == Int
-		mass_values = (mass_values,)
-	end
-
-	indices = Array{CartesianIndex{2}, 1}()
-
-	# Add indices that correspond to given mz values
-	for mass in mass_values
-		mass_range = [mass - MAX_MASS_DEVIATION, mass + MAX_MASS_DEVIATION]
-
-		# Store which indices are between mass range
-		append!(indices, findall(mz -> (mz .>= mass_range[1]) .& (mz .<= mass_range[2]), spectrum["Mz_values"]))
-	end
-
-	# Create XIC spectrum
-	spectrum_XIC = @MVector zeros(Int, size(spectrum["Mz_values"], 1))
-
-	# Filter spectrum using stored indices
-	for I in indices
-		spectrum_XIC[I[1]] += spectrum["Mz_intensity"][I]
-	end
-
-	return spectrum_XIC
-end
-
-
-function batch_import(pathin)
-	"""Returns list containing all imported spectra from folder"""
-	mz_thresh = [0, 0]
-	Int_thresh = 0
-	files = readdir(pathin, sort=false)
-	files_supported = zeros(Bool, length(files),1)
-
-	# Determine supported files
-	for i=1:length(files)
-		if lowercase(files[i][end-4:end]) == "mzxml" || lowercase(files[i][end-3:end]) == "cdf"
-			files_supported[i] = true
-		end
-	end
-
-	# Save indices of supported files
-	supported_indices=findall(x -> x == true, files_supported)
-	num_of_spectra = length(supported_indices)
-
-	# Create array for storing spectra
-	spectra = Array{Any}(undef,size(supported_indices,1))
-
-	# Load files into spectra array
-	for (i, file_index) in enumerate(supported_indices)
-		filename = files[file_index]
-		spectra[i] = import_files(pathin,[filename],mz_thresh,Int_thresh)
-		spectra[i]["MS1"]["Filename"] = [filename]
-		spectra[i]["MS1"]["Sample Name"] = [retrieve_sample_name(pathin, filename)]
-		
-
-		println("Read spectra $(i[1]) of $num_of_spectra")
-	end
-
-	return spectra
-end
-
-function retrieve_sample_name(pathin, filename)
-	# Path to xml file which contains Sample Name
-	folder_name = filename[begin:end-5] * "D"
-	folder_loc = joinpath(pathin, folder_name)
-	sample_info_file = joinpath(folder_loc, "AcqData\\sample_info.xml")
-
-	# File does not exist
-	if !isfile(sample_info_file)
-		return ""
-	end
-
-	# Load xml file into array
-	xdoc = parse_file(sample_info_file)
-	xroot = root(xdoc)
-	xarray = xroot["Field"]
-
-	# Find index where Sample Name is stored and retrieve its value
-	element_index = findfirst(i -> content(find_element(i, "Name")) == "Sample Name", xarray)
-	sample_name = content(find_element(xarray[element_index], "Value"))
-
-	# Free memory
-	free(xdoc)
-
-	return sample_name
-end
 
 function determine_noise(spectrum_part)
 	"""Returns median of noise or -1 if peak detected"""
-	# spectrum_part = [0, 100, 0, 100, 100, 0]
+	
 
 	# More than 80% zeros, noise level of 0
 	if count(x -> x == 0, spectrum_part) / length(spectrum_part) > 0.8 # TODO maybe global?
