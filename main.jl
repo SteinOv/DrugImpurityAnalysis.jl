@@ -84,11 +84,22 @@ function main()
 				compound = row.compound
 				RT = row.RT * RT_modifier
 
-				mass_vals = split(row.mz, ";")
-				mass_vals = [parse(Float32, mass) for mass in mass_vals]
+				# For tuples of mz values
+				mass_str = split(row.mz, ";")
+				mass_values = Array{Any,1}(undef, length(mass_str))
+				for (i, mass) in enumerate(mass_str)
+					if startswith(mass, "(")
+						mass = split(mass[2:end - 1], ",")
+						mass_values[i] = Tuple(([parse(Float32, sub_mass) for sub_mass in mass]))
+					else
+						mass_values[i] = parse(Float32, mass)
+					end	
+				end
+
+				# append!(mass_values, [parse(Float32, mass) for mass in mass_vals])
 
 				# Integrate all mz values
-				mass_integral = integrate_peaks(spectrum, RT, mass_vals)
+				mass_integral = integrate_peaks(spectrum, RT, mass_values)
 
 				# Determine final intensity for use in RT_deviation
 				intensity = determine_intensity(mass_integral)
@@ -189,7 +200,7 @@ function integrate_peaks(spectrum, RT, mz_vals)
 	RT_range = [RT - MAX_RT_DEVIATION, RT + MAX_RT_DEVIATION]
 	RT_range_index = RT_indices(spectrum, RT_range)
 
-	mass_integral = @MMatrix zeros(Float64, length(mz_vals), 2)
+	mass_integral = Array{Any,2}(undef, length(mz_vals), 2)
 
 	for (i, mz) in enumerate(mz_vals)
 		mass_integral[i, 1] = mz
@@ -317,5 +328,5 @@ function determine_noise(spectrum_part)
 	end
 end
 
-main()
+# main()
 

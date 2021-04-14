@@ -1,11 +1,11 @@
 ﻿compound,RT,mz,type,type_int,ratio
 cocaine,6.63,182.12;82.07;83.07;94.07;77.04;105.03;96.08;42.03;303.15,major,-1,0.72;1;0.37;0.37;0.36;0.3;0.25;0.17;0.14
 C28,8.15,57;43;71;85,internal_standard,-10,10
-tropacocaine,5.83,124;245,impurity,0,1;0.15
+tropacocaine,5.83,"(124,82,94,83,77,105,245)",impurity,0,1;0.15
 norcocaine,6.51,168;68;136;77;108;105;80,impurity,0,1;0.41;0.38;0.33;0.25;0.24;0.23
 N-benzoylnormethylecgonine,6.87,105;77;184;51;68;136;168,impurity,0,1;0.8;0.4;0.3;0.2;0.15;0.15
-cis-cinnamoylcocaine,7.17,329;298;238;198,impurity,0,
-trans-cinnamoylcocaine,7.54,329;298;238;198,impurity,0,
+cis-cinnamoylcocaine,7.17,"(82, 182, 83, 96, 94)",impurity,0,
+trans-cinnamoylcocaine,7.54,"(82, 182, 83, 96, 94)",impurity,0,
 lidocaine,5.56,86;58;87;30;72;120;56,adulterant,1,1;0.07;0.06;0.03;0.03;0.03;0.03
 procaine,6.06,86;99;120;164;92;87;58,adulterant,1,1;0.37;0.31;0.09;0.07;0.06;0.05
 tetracaine,6.67,176,adulterant,1,0.14
