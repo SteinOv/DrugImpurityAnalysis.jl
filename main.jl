@@ -11,12 +11,13 @@ using BenchmarkTools
 include("manual_visualisation.jl")
 include("helpers.jl")
 
-# Minimum intensity of cocaine to process sample
-const MIN_INTENSITY = 10^5
-const NORM_CONSTANT = 10000
+const NORM_CONSTANT = 1000000
 const MAX_MASS_DEVIATION = 0.5
 const MAX_RT_DEVIATION = 0.08
-const NOISE_CUTOFF = 1000 # TODO Maybe determined dynamically
+const MAX_PEAK_SCANS = 40 # Max scans for peak 40 scans is 0.1 minute
+const NOISE_INTERVAL_SIZE = 20 # Size of interval to search for noise
+const NOISE_CROSSINGS_FRACTION = 0.2
+const NOISE_ZEROS_FRACTION = 0.8
 
 
 
@@ -29,14 +30,14 @@ function main()
 
 	# Specify path
 	data_folder = "P:/Git/bachelor_project/data"
-	subfolder = "200006"
+	# subfolder = "200006"
 	pathin = joinpath(data_folder, subfolder)
 	csvout = joinpath(pathin, "impurity_profile.csv")
 
 	# Import spectra
 	load_time = @elapsed spectra = batch_import(pathin)
 	
-	# @btime begin #  3.168 s (7339762 allocations: 277.15 MiB)
+	# @btime begin #  2.838 s (5479065 allocations: 182.38 MiB) (folder: 200006)
 		# Import RT and mz info of valid compounds into DataFrame
 		compounds = CSV.read("compounds.csv", DataFrame)
 		filter!(row -> !(any(ismissing, (row.RT, row.mz)) || any((row.RT, row.mz) .== 0)), compounds)
@@ -104,6 +105,7 @@ function main()
 
 	# spectrum = spectra[3]["MS1"]
 	# plt(303)
+	# plt()
 
 
 
@@ -131,17 +133,22 @@ function process_major(compounds, spectrum)
 	maximum_RT = findmax(filter_XIC(spectrum, highest_mass)[RT_range_index[1]:RT_range_index[2]])
 	real_RT = spectrum["Rt"][maximum_RT[2] + RT_range_index[1] - 1]
 
-	# Peak below noise
-	if maximum_RT[1] < NOISE_CUTOFF
-		return (0, 0, major_compound_name)
-	end
-
 	# Compute RT modifier
 	RT_modifier = round(real_RT / RT, digits = 3)
 	RT = real_RT
 
+	# Determine IS/cocaine ratio
+	highest_mz_intensity = integrate_peaks(spectrum, RT, highest_mass)[1, 2]
 	IS_RT = IS_RT * RT_modifier
 	IS_integral = integrate_peaks(spectrum, IS_RT, IS_mass_vals[1])[1, 2]
+	# Ratio too high, no significant amount of major compound present 
+	if IS_integral / highest_mz_intensity > IS_major_ratio || highest_mz_intensity == 0
+		return (0, 0, major_compound_name)
+	elseif IS_integral == 0
+		error("Cocaine peak detected, but internal standard not detected")
+	end
+
+
 
 	# Integrate all mz values
 	mass_integral = integrate_peaks(spectrum, RT, mass_vals)
@@ -150,10 +157,8 @@ function process_major(compounds, spectrum)
 	highest_mass_i = findfirst(x -> x == highest_mass, mass_integral[:, 1])
 	hi_mz_intensity = mass_integral[highest_mass_i, 2]
 
-	# Ratio too high, no significant amount of major compound present
-	if IS_integral / hi_mz_intensity > IS_major_ratio
-		return (0, 0, major_compound_name)
-	end
+	
+
 
 	# Determine final intensity for use in RT_deviation
 	intensity = determine_intensity(mass_integral)
@@ -172,125 +177,124 @@ function determine_intensity(mass_integral)
 	return sum(mass_integral[:, 2])
 end
 
-
-
-
-
-"""
-TODO
-- Improve overlapping peak integration by predicting actual integral after peak overlap
-- Noise cut off determined dynamically
-- Peak shape should be the same for each mass, only determine peak range for one mass
-
-"""
-function integrate_peaks(spectrum, RT, mass_vals)
+# NEW VERSION
+function integrate_peaks(spectrum, RT, mz_vals)
 	"""
 	Integrates peaks of specific compound
 
 	Returns matrix mass_integral, where row 1 are the mz values
 	and row 2 the corresponding intensities
 	"""
-
+	
 	RT_range = [RT - MAX_RT_DEVIATION, RT + MAX_RT_DEVIATION]
-
 	RT_range_index = RT_indices(spectrum, RT_range)
 
-	# Determine peak range based on first mass
-	mass = mass_vals[1]
-	spectrum_XIC = filter_XIC(spectrum, mass)
+	mass_integral = @MMatrix zeros(Float64, length(mz_vals), 2)
 
-	# Determine maximum within RT and mass range
-	(max_intensity, max_index) = findmax(spectrum_XIC[RT_range_index[1]:RT_range_index[2]])
-	max_index += RT_range_index[1] - 1
+	for (i, mz) in enumerate(mz_vals)
+		mass_integral[i, 1] = mz
+		spectrum_XIC = filter_XIC(spectrum, mz)
 
-	mass_integral = @MMatrix zeros(Float64, length(mass_vals), 2)
+		# Determine maximum within RT and mass range
+		(max_intensity, max_index) = findmax(spectrum_XIC[RT_range_index[1]:RT_range_index[2]])
+		max_index += RT_range_index[1] - 1
 
-	# Below noise cutoff, set intensity to zero
-	if max_intensity < NOISE_CUTOFF
-		mass_integral[:, 1] .= mass_vals
-		return mass_integral
-	end
+		# Define bounds around maximum
+		left_index = max_index - MAX_PEAK_SCANS
+		right_index = max_index + MAX_PEAK_SCANS
 
-	peak_range = @MVector zeros(Int16, 2)
-
-	for (j, direction) in enumerate([-1, 1])
-		peak_end = find_end_of_peak(spectrum_XIC, max_intensity, max_index, direction)
-		peak_range[j] = peak_end[1]
-		if peak_end[2]
-			println("WARNING: Peak overlap at file: $(spectrum["Filename"][1])")
-			println("RT: $(spectrum["Rt"][peak_end[1]]), mass: $mass, index: $(peak_end[1])")
+		# A lot of intensities of zero with a peak in between TODO needs improvement for narrow peaks
+		if determine_noise(spectrum_XIC[left_index:right_index]) == 0 && max_intensity > 0
+			left_index = findlast(x -> x == 0, spectrum_XIC[left_index:max_index]) + left_index - 1
+			right_index = findfirst(x -> x == 0, spectrum_XIC[max_index:right_index]) + max_index - 1
+			mass_integral[i, 2] = sum(spectrum_XIC[left_index:right_index])
+			continue
+		# No peak
+		elseif max_intensity == 0
+			mass_integral[i, 2] = 0
+			continue
 		end
+
+		# Define peak between minima left and right of the maximum
+		min_left = minimum(spectrum_XIC[left_index:max_index])
+		min_right = minimum(spectrum_XIC[max_index:right_index])
+		left_index = findlast(x -> x == min_left, spectrum_XIC[left_index:max_index]) + left_index - 1
+		right_index = findfirst(x -> x == min_right, spectrum_XIC[max_index:right_index]) + max_index - 1
+
+		# Check if peak is actual peak and not noise
+		noise_median = determine_noise(spectrum_XIC[left_index:right_index])
+		if noise_median >= 0
+			mass_integral[i, 2] = 0
+			continue
+		end
+
+		# Check if peak has overlap, if so, define peak end between overlapping peaks
+		under_median_count = 0
+		peak_end = Int32[-1, -1]
+		for (j, index_range) in enumerate(((max_index, left_index), (max_index, right_index)))
+			range_order = index_range[1] < index_range[2] ? (index_range[1], index_range[2]) : (index_range[2], index_range[1])
+			range_median = median(spectrum_XIC[range_order[1]:range_order[2]])
+
+			for k in index_range[1]:index_range[2]
+				# At least two consecutive times below median and subsequently above median
+				if spectrum_XIC[k] > range_median && under_median_count > 1
+					spectrum_part = k < max_index ? spectrum_XIC[k:max_index] : spectrum_XIC[max_index:k]
+					peak_end[j] = findmin(spectrum_part)[2]
+					break
+				# Below median
+				elseif spectrum_XIC[k] < range_median
+					under_median_count += 1
+				# Above median, has not been below median consecutively
+				else
+					under_median_count = 0
+				end
+			end
+		end
+
+		# Search for closest noise looking left and right of max
+		noise_found = false
+		direction = -1
+		noise_search = [i == -1 ? max_index : i + left_index - 1 for i in peak_end]
+		while !noise_found # TODO stop searching when end of spectrum is reached
+			j = direction == -1 ? 1 : 2
+			noise_search[j] += NOISE_INTERVAL_SIZE * direction
+			noise_interval_start = noise_search[j] + NOISE_INTERVAL_SIZE * direction
+			spectrum_part = direction == -1 ? spectrum_XIC[noise_interval_start:noise_search[j]] : spectrum_XIC[noise_search[j]:noise_interval_start]
+			noise_median = determine_noise(spectrum_part)
+
+			if noise_median >= 0
+				noise_found = true
+			end
+
+			direction *= -1
+		end
+
+		# Substract noise median around peak max
+		spectrum_part = spectrum_XIC[left_index:right_index]
+		replace!(x -> x < noise_median ? 0 : x - noise_median, spectrum_part)
+
+		# Find minimum left and right closest to max
+		max_index = findmax(spectrum_part)[2]
+		min_left = minimum(spectrum_part[1:max_index])
+		min_right = minimum(spectrum_part[max_index:end])
+		right_index = peak_end[2] == -1 ? findlast(x -> x == min_right, spectrum_part[max_index:end]) + max_index - 1 : peak_end[2] - left_index + 1
+		left_index = peak_end[1] == -1 ? findfirst(x -> x == min_left, spectrum_part[1:max_index]) : peak_end[1] - left_index + 1
+
+		# Integrate peak
+		mass_integral[i, 2] = sum(spectrum_part[left_index:right_index])
+
 	end
-
-
-	# Integrate peak for all mz values
-	for (i, mass) in enumerate(mass_vals)
-		mass_integral[i, 1] = mass
-		spectrum_XIC = filter_XIC(spectrum, mass)
-		
-		integral = sum(spectrum_XIC[peak_range[1]:peak_range[2]])
-		mass_integral[i,2] = integral
-			
-	end
-
-
 
 	return mass_integral
 end
-
-function find_end_of_peak(spectrum_XIC, max_intensity, max_index, direction)
-
-	last_intensity = max_intensity
-	current_index = max_index
-	below_noise_cutoff = false
-	reached_noise = false
-
-	peak_overlap = false
-
-	# For storing last intensity changes
-	history_size = 5
-	last_intensity_changes = @MVector zeros(Int64, history_size)
-
-	i = 0
-	while current_index > 1 && current_index < (length(spectrum_XIC) - 1)
-		i = i % history_size + 1
-		current_index += direction
-
-		current_intensity = spectrum_XIC[current_index]
-		mean_intensity_change = (last_intensity_changes[1] + last_intensity_changes[end]) / 2
-
-		# Large intensity increase, peak overlap
-		if mean_intensity_change > 20*NOISE_CUTOFF
-			peak_overlap = true
-			current_index -= (history_size - 1) * direction
-			break
-		# Below noise cut off and intensity decreasing
-		elseif current_intensity < NOISE_CUTOFF && current_intensity < last_intensity
-			below_noise_cutoff = true
-		# Below noise cut off and intensity increasing or reached zero
-		elseif (below_noise_cutoff && current_intensity > last_intensity) || current_intensity <= 0
-			reached_noise = true
-			current_index -= direction
-			break
-		end
-		
-		last_intensity_changes[i] = current_intensity - last_intensity
-		last_intensity = current_intensity
-		
-	end
-
-	return current_index, peak_overlap
-end
-
-
 
 
 function determine_noise(spectrum_part)
 	"""Returns median of noise or -1 if peak detected"""
 	
 
-	# More than 80% zeros, noise level of 0
-	if count(x -> x == 0, spectrum_part) / length(spectrum_part) > 0.8 # TODO maybe global?
+	# Large amount of intensities of zero
+	if count(x -> x == 0, spectrum_part) / length(spectrum_part) > NOISE_ZEROS_FRACTION
 		return 0
 	end
 
@@ -305,12 +309,13 @@ function determine_noise(spectrum_part)
 		end
 	end
 
-	# Fraction of crossings is smaller than 20%, peak instead of noise
-	if crossings_count / length(spectrum_part) < 0.2 # TODO maybe global?
+	# Small fraction of median crossings, peak instead of noise
+	if crossings_count / length(spectrum_part) < NOISE_CROSSINGS_FRACTION
 		return -1
 	else
 		return spectr_median
+	end
+end
 
-
-# main()
+main()
 
