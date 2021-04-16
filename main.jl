@@ -42,7 +42,7 @@ function main()
 	# Import spectra
 	load_time = @elapsed spectra = batch_import(pathin)
 	
-	# @btime begin #  2.838 s (5479065 allocations: 182.38 MiB) (folder: 200006)
+	# @btime begin # 4.028 s (9055918 allocations: 291.23 MiB) (folder: 200006)
 		# Import RT and mz info of valid compounds into DataFrame
 		compounds = CSV.read("compounds.csv", DataFrame)
 		filter!(row -> !(any(ismissing, (row.RT, row.mz)) || any((row.RT, row.mz) .== 0)), compounds)
@@ -116,7 +116,7 @@ function main()
 			push!(imp_profile, append!(sample_metadata, sample_profile))
 			println("Done")
 		end
-	# end
+	# end # @btime
 	CSV.write(csvout, imp_profile)
 
 
