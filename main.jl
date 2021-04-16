@@ -14,9 +14,13 @@ include("helpers.jl")
 const NORM_CONSTANT = 1000000
 const MAX_MASS_DEVIATION = 0.5
 const MAX_RT_DEVIATION = 0.08
-const MAX_PEAK_SCANS = 40 # Max scans for peak 40 scans is 0.1 minute
+
+# 40 scans is 0.1 minute
+const MAX_PEAK_SCANS_DETERMINATION = 20 # Used for differentiating peak from noise
+const MAX_PEAK_SCANS_INTEGRATION = 60 # Bounds for peak integration
+
 const NOISE_INTERVAL_SIZE = 20 # Size of interval to search for noise
-const NOISE_CROSSINGS_FRACTION = 0.2
+const NOISE_CROSSINGS_FRACTION = 0.33
 const NOISE_ZEROS_FRACTION = 0.8
 
 
@@ -29,8 +33,9 @@ TODO
 function main()
 
 	# Specify path
-	data_folder = "P:/Git/bachelor_project/data"
-	# subfolder = "200006"
+	# data_folder = "P:/Git/bachelor_project/data"
+	data_folder = joinpath(@__DIR__, "data")
+	subfolder = "200006"
 	pathin = joinpath(data_folder, subfolder)
 	csvout = joinpath(pathin, "impurity_profile.csv")
 
@@ -52,6 +57,7 @@ function main()
 		for name in compounds_in_prof.compound
 			insertcols!(imp_profile, Symbol(name) => Int32[])
 		end
+		spectrum = spectra[30]["MS1"]		
 
 		# Analyse all spectra
 		sample_profile = zeros(Int32, size(compounds_in_prof, 1))
@@ -188,7 +194,7 @@ function determine_intensity(mass_integral)
 	return sum(mass_integral[:, 2])
 end
 
-# NEW VERSION
+
 function integrate_peaks(spectrum, RT, mz_vals)
 	"""
 	Integrates peaks of specific compound
@@ -211,10 +217,10 @@ function integrate_peaks(spectrum, RT, mz_vals)
 		max_index += RT_range_index[1] - 1
 
 		# Define bounds around maximum
-		left_index = max_index - MAX_PEAK_SCANS
-		right_index = max_index + MAX_PEAK_SCANS
+		left_index = max_index - round(Int, MAX_PEAK_SCANS_DETERMINATION / 2)
+		right_index = max_index + round(Int, MAX_PEAK_SCANS_DETERMINATION / 2)
 
-		# A lot of intensities of zero with a peak in between TODO needs improvement for narrow peaks
+		# A lot of intensities of zero with a peak in between
 		if determine_noise(spectrum_XIC[left_index:right_index]) == 0 && max_intensity > 0
 			left_index = findlast(x -> x == 0, spectrum_XIC[left_index:max_index]) + left_index - 1
 			right_index = findfirst(x -> x == 0, spectrum_XIC[max_index:right_index]) + max_index - 1
@@ -233,11 +239,14 @@ function integrate_peaks(spectrum, RT, mz_vals)
 		right_index = findfirst(x -> x == min_right, spectrum_XIC[max_index:right_index]) + max_index - 1
 
 		# Check if peak is actual peak and not noise
-		noise_median = determine_noise(spectrum_XIC[left_index:right_index])
-		if noise_median >= 0
+		if determine_noise(spectrum_XIC[left_index:right_index]) >= 0
 			mass_integral[i, 2] = 0
 			continue
 		end
+
+		# Broader bounds for integration
+		left_index = max_index - round(Int, MAX_PEAK_SCANS_INTEGRATION / 2)
+		right_index = max_index + round(Int, MAX_PEAK_SCANS_INTEGRATION / 2)
 
 		# Check if peak has overlap, if so, define peak end between overlapping peaks
 		under_median_count = 0
@@ -250,7 +259,7 @@ function integrate_peaks(spectrum, RT, mz_vals)
 				# At least two consecutive times below median and subsequently above median
 				if spectrum_XIC[k] > range_median && under_median_count > 1
 					spectrum_part = k < max_index ? spectrum_XIC[k:max_index] : spectrum_XIC[max_index:k]
-					peak_end[j] = findmin(spectrum_part)[2]
+					peak_end[j] = k < max_index ? findmin(spectrum_part)[2] + k - 1 : findmin(spectrum_part)[2] + max_index - 1
 					break
 				# Below median
 				elseif spectrum_XIC[k] < range_median
@@ -264,17 +273,18 @@ function integrate_peaks(spectrum, RT, mz_vals)
 
 		# Search for closest noise looking left and right of max
 		noise_found = false
+		noise_median = Int
 		direction = -1
-		noise_search = [i == -1 ? max_index : i + left_index - 1 for i in peak_end]
+		noise_search = [i == -1 ? max_index : i for i in peak_end]
 		while !noise_found # TODO stop searching when end of spectrum is reached
 			j = direction == -1 ? 1 : 2
 			noise_search[j] += NOISE_INTERVAL_SIZE * direction
 			noise_interval_start = noise_search[j] + NOISE_INTERVAL_SIZE * direction
 			spectrum_part = direction == -1 ? spectrum_XIC[noise_interval_start:noise_search[j]] : spectrum_XIC[noise_search[j]:noise_interval_start]
-			noise_median = determine_noise(spectrum_part)
 
-			if noise_median >= 0
+			if determine_noise(spectrum_part) >= 0
 				noise_found = true
+				noise_median = median(spectrum_part)
 			end
 
 			direction *= -1
@@ -288,8 +298,8 @@ function integrate_peaks(spectrum, RT, mz_vals)
 		max_index = findmax(spectrum_part)[2]
 		min_left = minimum(spectrum_part[1:max_index])
 		min_right = minimum(spectrum_part[max_index:end])
-		right_index = peak_end[2] == -1 ? findlast(x -> x == min_right, spectrum_part[max_index:end]) + max_index - 1 : peak_end[2] - left_index + 1
-		left_index = peak_end[1] == -1 ? findfirst(x -> x == min_left, spectrum_part[1:max_index]) : peak_end[1] - left_index + 1
+		right_index = peak_end[2] == -1 ? findfirst(x -> x == min_right, spectrum_part[max_index:end]) + max_index - 1 : peak_end[2] - left_index + 1
+		left_index = peak_end[1] == -1 ? findlast(x -> x == min_left, spectrum_part[1:max_index]) : peak_end[1] - left_index + 1
 
 		# Integrate peak
 		mass_integral[i, 2] = sum(spectrum_part[left_index:right_index])
@@ -301,7 +311,7 @@ end
 
 
 function determine_noise(spectrum_part)
-	"""Returns median of noise or -1 if peak detected"""
+	"""Returns mean of noise or -1 if peak detected"""
 	
 
 	# Large amount of intensities of zero
@@ -309,24 +319,90 @@ function determine_noise(spectrum_part)
 		return 0
 	end
 
-	spectr_median = median(spectrum_part)
+	spectrum_part_mean = mean(spectrum_part)
 
-	# Count number of median crossings
+	# Count number of mean crossings
 	crossings_count = 0
 	for i in 2:length(spectrum_part)
-		crosses_median = (spectrum_part[i] - spectr_median) * (spectrum_part[i - 1] - spectr_median) <= 0
-		if crosses_median
+		crosses_mean = (spectrum_part[i] - spectrum_part_mean) * (spectrum_part[i - 1] - spectrum_part_mean) <= 0
+		if crosses_mean
 			crossings_count += 1
 		end
 	end
 
-	# Small fraction of median crossings, peak instead of noise
+	# Small fraction of mean crossings, peak instead of noise
 	if crossings_count / length(spectrum_part) < NOISE_CROSSINGS_FRACTION
 		return -1
 	else
-		return spectr_median
+		return round(Int, spectrum_part_mean)
 	end
 end
 
 # main()
 
+
+
+# test = rand(Int32, 3000)
+
+# @btime begin
+# 	test_1 = Array{Int32,1}(undef, length(test))
+# 	test_1 .= test
+# end
+
+# @btime begin
+# 	test_1 = zeros(Int32, length(test))
+# 	test_1 .= test
+# end
+
+# @btime begin
+# 	test_1 = @MVector zeros(Int32, length(test))
+# 	# MVector{size(test), Int32}()
+# 	test_1 .= test
+# end
+
+# @btime begin
+# 	test_1 = t[tes .= test] 
+# end
+
+
+# function test_fun()
+
+# i = 0
+# t = false
+# j = Int32
+# while !t
+# 	i += 1
+# 	if i == 3
+# 		t = true
+# 		j = 13
+# 	end
+# end
+
+# q = j
+# print(q)
+
+# end
+
+
+
+# # Search for closest noise looking left and right of max
+# noise_found = false
+# direction = -1
+# noise_search = [i == -1 ? max_index : i for i in peak_end]
+# while !noise_found # TODO stop searching when end of spectrum is reached
+# 	j = direction == -1 ? 1 : 2
+# 	noise_search[j] += NOISE_INTERVAL_SIZE * direction
+# 	noise_interval_start = noise_search[j] + NOISE_INTERVAL_SIZE * direction
+# 	spectrum_part = direction == -1 ? spectrum_XIC[noise_interval_start:noise_search[j]] : spectrum_XIC[noise_search[j]:noise_interval_start]
+
+# 	if determine_noise(spectrum_part) >= 0
+# 		noise_found = true
+# 		noise_median = mean(spectrum_part)
+# 	end
+
+# 	direction *= -1
+# end
+
+# # Substract noise median around peak max
+# spectrum_part = spectrum_XIC[left_index:right_index]
+# replace!(x -> x < noise_median ? 0 : x - noise_median, spectrum_part)
