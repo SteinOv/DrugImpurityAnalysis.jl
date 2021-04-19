@@ -22,6 +22,7 @@ const MAX_PEAK_SCANS_INTEGRATION = 60 # Bounds for peak integration
 const NOISE_INTERVAL_SIZE = 20 # Size of interval to search for noise
 const NOISE_CROSSINGS_FRACTION = 0.33
 const NOISE_ZEROS_FRACTION = 0.8
+const OVERLAP_BELOW_MEDIAN = 3
 
 
 
@@ -42,7 +43,7 @@ function main()
 	# Import spectra
 	load_time = @elapsed spectra = batch_import(pathin)
 	
-	# @btime begin # 4.028 s (9055918 allocations: 291.23 MiB) (folder: 200006)
+	# @btime begin # 3.984 s (9058147 allocations: 291.28 MiB) (folder: 200006)
 		# Import RT and mz info of valid compounds into DataFrame
 		compounds = CSV.read("compounds.csv", DataFrame)
 		filter!(row -> !(any(ismissing, (row.RT, row.mz)) || any((row.RT, row.mz) .== 0)), compounds)
@@ -57,7 +58,6 @@ function main()
 		for name in compounds_in_prof.compound
 			insertcols!(imp_profile, Symbol(name) => Int32[])
 		end
-		spectrum = spectra[30]["MS1"]		
 
 		# Analyse all spectra
 		sample_profile = zeros(Int32, size(compounds_in_prof, 1))
@@ -122,6 +122,9 @@ function main()
 
 	# spectrum = spectra[3]["MS1"]
 	# plt(303)
+	# plt()
+	# spectrum = spectra[33]["MS1"]
+	# plt(77)
 	# plt()
 
 
@@ -256,8 +259,8 @@ function integrate_peaks(spectrum, RT, mz_vals)
 			range_median = median(spectrum_XIC[range_order[1]:range_order[2]])
 
 			for k in index_range[1]:index_range[2]
-				# At least two consecutive times below median and subsequently above median
-				if spectrum_XIC[k] > range_median && under_median_count > 1
+				# consecutively below median and subsequently above median
+				if spectrum_XIC[k] > range_median && under_median_count >= OVERLAP_BELOW_MEDIAN
 					spectrum_part = k < max_index ? spectrum_XIC[k:max_index] : spectrum_XIC[max_index:k]
 					peak_end[j] = k < max_index ? findmin(spectrum_part)[2] + k - 1 : findmin(spectrum_part)[2] + max_index - 1
 					break
@@ -341,68 +344,63 @@ end
 # main()
 
 
+# using LinearAlgebra, SparseArrays
 
-# test = rand(Int32, 3000)
+# function AsLS(y, lambda, p)
+# 	y = vec(y)
 
-# @btime begin
-# 	test_1 = Array{Int32,1}(undef, length(test))
-# 	test_1 .= test
-# end
+# 	# Estimate baseline with asymmetric least squares
+# 	m = length(y)
+# 	d = zeros(m,m)
+# 	d[diagind(d)] .= 1
+# 	D = diff(diff(d, dims = 1),dims =1)
+# 	w = ones(m, 1)
+# 	z = []
 
-# @btime begin
-# 	test_1 = zeros(Int32, length(test))
-# 	test_1 .= test
-# end
-
-# @btime begin
-# 	test_1 = @MVector zeros(Int32, length(test))
-# 	# MVector{size(test), Int32}()
-# 	test_1 .= test
-# end
-
-# @btime begin
-# 	test_1 = t[tes .= test] 
-# end
-
-
-# function test_fun()
-
-# i = 0
-# t = false
-# j = Int32
-# while !t
-# 	i += 1
-# 	if i == 3
-# 		t = true
-# 		j = 13
-# 	end
-# end
-
-# q = j
-# print(q)
-
-# end
-
-
-
-# # Search for closest noise looking left and right of max
-# noise_found = false
-# direction = -1
-# noise_search = [i == -1 ? max_index : i for i in peak_end]
-# while !noise_found # TODO stop searching when end of spectrum is reached
-# 	j = direction == -1 ? 1 : 2
-# 	noise_search[j] += NOISE_INTERVAL_SIZE * direction
-# 	noise_interval_start = noise_search[j] + NOISE_INTERVAL_SIZE * direction
-# 	spectrum_part = direction == -1 ? spectrum_XIC[noise_interval_start:noise_search[j]] : spectrum_XIC[noise_search[j]:noise_interval_start]
-
-# 	if determine_noise(spectrum_part) >= 0
-# 		noise_found = true
-# 		noise_median = mean(spectrum_part)
+# 	for it = 1:10
+# 		W = spdiagm(m, m, 0 => vec(w))
+# 	    C = cholesky(W + lambda * D' * D)
+# 	    z = C.U \ (C.U' \ (w .* y))
+# 	    w = p * (y .> z) + (1 - p) * (y .< z)
 # 	end
 
-# 	direction *= -1
+# 	return z
 # end
 
-# # Substract noise median around peak max
-# spectrum_part = spectrum_XIC[left_index:right_index]
-# replace!(x -> x < noise_median ? 0 : x - noise_median, spectrum_part)
+# # Cinnamoylcocaine
+# spectrum = spectra[33]["MS1"]
+# spectrum_XIC = filter_XIC(spectrum, (82, 182, 83, 96, 94))[2075:2270]
+# x = spectrum["Rt"][2075:2270]
+
+# baseline = AsLS(spectrum_XIC, 20000, 0.01)
+# plot(x, spectrum_XIC)
+# plot!(x, baseline)
+# ylims!(0, 10000)
+# xlims!(7, 7.5)
+
+# # Norcocaine
+# spectrum = spectra[33]["MS1"]
+# spectrum_XIC = filter_XIC(spectrum, 168)[1798:1890]
+# x = spectrum["Rt"][1798:1890]
+
+# baseline = AsLS(spectrum_XIC, 10000, 0.01)
+# plot(x, spectrum_XIC)
+# plot!(x, baseline)
+# # ylims!(0, 10000)
+# # xlims!(7, 7.5)
+
+
+
+# plt((168,68,136), 6.5)
+# plt!((168), 6.5)
+# plt!((68,136), 6.5)
+
+# # High norcocaine
+# spectrum = spectra[17]["MS1"]
+# ylims!(0, 100000)
+# xlims!(6.25, 6.7)
+
+# # Low norcocaine
+# spectrum = spectra[29]["MS1"]
+# xlims!(6.35, 6.45)
+# ylims!(0, 5000)
