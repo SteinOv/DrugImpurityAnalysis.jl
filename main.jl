@@ -13,7 +13,7 @@ include("helpers.jl")
 
 const NORM_CONSTANT = 1000000
 const MAX_MASS_DEVIATION = 0.5
-const MAX_RT_DEVIATION = 0.08
+const MAX_RT_DEVIATION = 0.05
 
 # 40 scans is 0.1 minute
 const MAX_PEAK_SCANS_DETERMINATION = 20 # Used for differentiating peak from noise
@@ -119,16 +119,6 @@ function main()
 		end
 	# end # @btime
 	CSV.write(csvout, imp_profile)
-
-
-	# spectrum = spectra[3]["MS1"]
-	# plt(303)
-	# plt()
-	# spectrum = spectra[33]["MS1"]
-	# plt(77)
-	# plt()
-
-
 
 end
 
@@ -237,23 +227,28 @@ function integrate_peaks(spectrum, RT, mz_vals, overlap_RT)
 		left_index = peak_end[1] == -1 ? left_index : peak_end[1]
 		right_index = peak_end[2] == -1 ? right_index : peak_end[2]
 
-		# Search for closest noise looking left and right of max
-		noise_found = false
+		# Search for closest noise, left if no overlap defined on left
+		direction = overlap_RT > 0 && overlap_RT < RT ? 1 : -1
+		noise_end = direction == -1 ? left_index : right_index + NOISE_INTERVAL_SIZE - 1
+		noise_start = noise_end - (NOISE_INTERVAL_SIZE - 1)
 		noise_median = Int
-		direction = -1
-		noise_search = [i == -1 ? max_index : i for i in peak_end]
-		while !noise_found # TODO stop searching when end of spectrum is reached
-			j = direction == -1 ? 1 : 2
-			noise_search[j] += NOISE_INTERVAL_SIZE * direction
-			noise_interval_start = noise_search[j] + NOISE_INTERVAL_SIZE * direction
-			spectrum_part = direction == -1 ? spectrum_XIC[noise_interval_start:noise_search[j]] : spectrum_XIC[noise_search[j]:noise_interval_start]
+		rep_count = 0 # TEMP
+		while noise_start > 0 && noise_end < length(spectrum_XIC)
+			noise_median = determine_noise(spectrum_XIC[noise_start:noise_end], true)
 
-			if determine_noise(spectrum_part) >= 0
-				noise_found = true
-				noise_median = median(spectrum_part)
+			# Noise found
+			if noise_median >= 0
+				break
 			end
+			
+			rep_count += 1
+			noise_start += NOISE_INTERVAL_SIZE * direction
+			noise_end += NOISE_INTERVAL_SIZE * direction
+		end
+		println("rep_count: $rep_count, mz: $mz, max_index: $max_index")
 
-			direction *= -1
+		if noise_median == -1
+			error("No noise found (mz: $mz)")
 		end
 
 		# Substract noise median around peak max
@@ -381,8 +376,11 @@ function determine_overlap(spectrum_XIC, left_index, right_index, max_index, ove
 	return peak_end
 end
 
-function determine_noise(spectrum_part)
-	"""Returns mean of noise or -1 if peak detected"""
+function determine_noise(spectrum_part, use_median=false)
+	"""
+	Returns mean or median of noise or -1 if peak detected
+	Uses mean by default, uses median if use_median=true
+	"""
 	
 
 	# Large amount of intensities of zero
@@ -390,22 +388,26 @@ function determine_noise(spectrum_part)
 		return 0
 	end
 
-	spectrum_part_mean = mean(spectrum_part)
+	if !use_median
+		spectrum_part_avg = mean(spectrum_part)
+	else
+		spectrum_part_avg = median(spectrum_part)
+	end
 
-	# Count number of mean crossings
+	# Count number of mean/median crossings
 	crossings_count = 0
 	for i in 2:length(spectrum_part)
-		crosses_mean = (spectrum_part[i] - spectrum_part_mean) * (spectrum_part[i - 1] - spectrum_part_mean) <= 0
+		crosses_mean = (spectrum_part[i] - spectrum_part_avg) * (spectrum_part[i - 1] - spectrum_part_avg) <= 0
 		if crosses_mean
 			crossings_count += 1
 		end
 	end
 
-	# Small fraction of mean crossings, peak instead of noise
+	# Small fraction of mean/median crossings, peak instead of noise
 	if crossings_count / length(spectrum_part) < NOISE_CROSSINGS_FRACTION
 		return -1
 	else
-		return round(Int, spectrum_part_mean)
+		return round(Int, spectrum_part_avg)
 	end
 end
 
@@ -472,3 +474,12 @@ end
 # spectrum = spectra[29]["MS1"]
 # xlims!(6.35, 6.45)
 # ylims!(0, 5000)
+
+
+
+# spectrum = spectra[3]["MS1"]
+# plt(303)
+# plt()
+# spectrum = spectra[33]["MS1"]
+# plt(77)
+# plt()
