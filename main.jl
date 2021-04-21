@@ -154,7 +154,7 @@ function process_major(compounds, spectrum)
 	IS_integral = integrate_peaks(spectrum, IS_RT, IS_mass_vals[1], 0)[1, 2]
 	# Ratio too high, no significant amount of major compound present 
 	if IS_integral / highest_mz_intensity > IS_major_ratio || highest_mz_intensity == 0
-		return (0, 0, major_compound_name)
+		return (0, RT_modifier, major_compound_name)
 	elseif IS_integral == 0
 		error("Cocaine peak detected, but internal standard not detected")
 	end
@@ -189,7 +189,7 @@ function determine_intensity(mass_integral)
 end
 
 
-function integrate_peaks(spectrum, RT, mz_vals, overlap_RT)
+function integrate_peaks(spectrum, RT, mz_vals, overlap_RT=0)
 	"""
 	Integrates peaks of specific compound
 
@@ -232,7 +232,7 @@ function integrate_peaks(spectrum, RT, mz_vals, overlap_RT)
 		noise_end = direction == -1 ? left_index : right_index + NOISE_INTERVAL_SIZE - 1
 		noise_start = noise_end - (NOISE_INTERVAL_SIZE - 1)
 		noise_median = Int
-		rep_count = 0 # TEMP
+		# rep_count = 0 # TEMP
 		while noise_start > 0 && noise_end < length(spectrum_XIC)
 			noise_median = determine_noise(spectrum_XIC[noise_start:noise_end], true)
 
@@ -241,11 +241,11 @@ function integrate_peaks(spectrum, RT, mz_vals, overlap_RT)
 				break
 			end
 			
-			rep_count += 1
+			# rep_count += 1 # TEMP
 			noise_start += NOISE_INTERVAL_SIZE * direction
 			noise_end += NOISE_INTERVAL_SIZE * direction
 		end
-		println("rep_count: $rep_count, mz: $mz, max_index: $max_index")
+		# println("rep_count: $rep_count, mz: $mz, max_index: $max_index") # TEMP
 
 		if noise_median == -1
 			error("No noise found (mz: $mz)")
