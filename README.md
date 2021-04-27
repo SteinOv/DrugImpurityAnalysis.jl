@@ -58,13 +58,13 @@ In short, the program consists of five steps\
 
 #### Process impurities and adulterants
 For each impurity/adulterant:
-  &nbsp;1\) The actual RT is determined by {predicted RT * RT modifier}\
-  For each mz value:\
+ &nbsp;1\) The actual RT is determined by {predicted RT * RT modifier}\
+ &nbsp;For each mz value:\
  &nbsp;&nbsp;2) An XIC spectrum is created of the specified mz value (or the sum of several mz values if defined in compounds.csv).\
  &nbsp;&nbsp;3) The peak is integrated\
-  &nbsp;4) The total intensity is determined\
-  &nbsp;5) The ratio to the major compound is calculated: {total intensity impurity/adulterant / total intensity major compound * factor}\
-  &nbsp;6) This ratio is added to the dataframe containing the metadata
+ &nbsp;4) The total intensity is determined\
+ &nbsp;5) The ratio to the major compound is calculated: {total intensity impurity/adulterant / total intensity major compound * factor}\
+ &nbsp;6) This ratio is added to the dataframe containing the metadata
 
 
 #### Write results to .csv file
