@@ -48,10 +48,10 @@ In short, the program consists of five steps\
 1) The filename, folder name and sample name are stored in a dataframe.
 
 #### Process major compound
-1) The actual retention time of the major compound is determined by searching for the highest intensity around the predicted RT in the ion-extracted chromatogram (XIC) of the highest mz value.
-2) The retention time modifier is determined {actual RT / predicted RT}.
-3) The highest mz value for the major compound is integrated.
-4) The highest mz value for the internal standard is integrated.
+1\) The actual retention time of the major compound is determined by searching for the highest intensity around the predicted RT in the ion-extracted chromatogram (XIC) of the highest mz value.\
+2) The retention time modifier is determined {actual RT / predicted RT}.\
+3) The highest mz value for the major compound is integrated.\
+4) The highest mz value for the internal standard is integrated.\
 5) The {IS / major compound} ratio is determined.\
 6.1) If the {IS / major compound} ratio is higher than the ratio defined in compounds.csv, the major integral is set to 0 and the sample is not processed further.\
 6.2) Else; The sample is processed further, all mz values of the major compound are integrated and the total intensity determined.
