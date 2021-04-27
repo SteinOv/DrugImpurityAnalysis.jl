@@ -31,9 +31,8 @@ compounds.csv should contain information about the major drug, impurities and ad
 
 ### Program in detail
 
-
-In short, the program consists of five steps
-- Read files
+In short, the program consists of five steps\
+- Read files\
   For each spectrum:
     - Process metadata
     - Process major compound 
@@ -53,16 +52,16 @@ In short, the program consists of five steps
 2) The retention time modifier is determined {actual RT / predicted RT}.
 3) The highest mz value for the major compound is integrated.
 4) The highest mz value for the internal standard is integrated.
-5) The {IS / major compound} ratio is determined.
-6.1) If the {IS / major compound} ratio is higher than the ratio defined in compounds.csv, the major integral is set to 0 and the sample is not processed further.
+5) The {IS / major compound} ratio is determined.\
+6.1) If the {IS / major compound} ratio is higher than the ratio defined in compounds.csv, the major integral is set to 0 and the sample is not processed further.\
 6.2) Else; The sample is processed further, all mz values of the major compound are integrated and the total intensity determined.
 
 #### Process impurities and adulterants
 For each impurity/adulterant:
-  1) The actual RT is determined by {predicted RT * RT modifier}
-  For each mz value:
-    2) An XIC spectrum is created of the specified mz value (or the sum of several mz values if defined in compounds.csv).
-    3) The peak is integrated
+  1) The actual RT is determined by {predicted RT * RT modifier}\
+  For each mz value:\
+    2) An XIC spectrum is created of the specified mz value (or the sum of several mz values if defined in compounds.csv).\
+    3) The peak is integrated\
   4) The total intensity is determined
   5) The ratio to the major compound is calculated: {total intensity impurity/adulterant / total intensity major compound * factor}
   6) This ratio is added to the dataframe containing the metadata
