@@ -16,8 +16,8 @@ using Pkg
 Pkg.add(PackageSpec(url="https://bitbucket.org/SSamanipour/ms_import.jl/src/master/"))
 ```
 
-The gc-ms files must have the .mzxml extension, gc-ms files can be converted to this extension using ProteoWizard: `http://proteowizard.sourceforge.net/download.html`
-The program supports importing sample names of .D files, to use this feature the .mzxml and .D files should both be in the same directory.
+The gc-ms files must have the .mzxml extension, gc-ms files can be converted to this extension using ProteoWizard: `http://proteowizard.sourceforge.net/download.html`\
+The program supports importing sample names of .D files, to use this feature the .mzxml and .D files should both be in the same directory.\
 The gc-ms files should be under data/[subfolder] and the subfolder name specified in main.jl.
 
 compounds.csv should contain information about the major drug, impurities and adulterants.
