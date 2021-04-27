@@ -6,7 +6,7 @@ include("helpers.jl")
 
 function display_distribution(compound)
     data_folder = joinpath(@__DIR__, "data")
-    subfolder = "cocaine_distribution"
+    subfolder = "tmp"
     pathin = joinpath(data_folder, subfolder)
     csvout = joinpath(pathin, "distribution.csv")
 

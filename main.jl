@@ -149,13 +149,13 @@ function process_major(compounds, spectrum)
 	RT = real_RT
 
 	# Determine IS/cocaine ratio
-	highest_mz_intensity = integrate_peaks(spectrum, RT, highest_mass, 0)[1, 2]
+	highest_mz_integral = integrate_peaks(spectrum, RT, highest_mass, 0)[1, 2]
 	IS_RT = IS_RT * RT_modifier
-	IS_integral = integrate_peaks(spectrum, IS_RT, IS_mass_vals[1], 0)[1, 2]
+	IS_highest_mz_integral = integrate_peaks(spectrum, IS_RT, IS_mass_vals[1], 0)[1, 2]
 	# Ratio too high, no significant amount of major compound present 
-	if IS_integral / highest_mz_intensity > IS_major_ratio || highest_mz_intensity == 0
+	if IS_highest_mz_integral / highest_mz_integral > IS_major_ratio || highest_mz_integral == 0
 		return (0, RT_modifier, major_compound_name)
-	elseif IS_integral == 0
+	elseif IS_highest_mz_integral == 0
 		error("Cocaine peak detected, but internal standard not detected")
 	end
 
@@ -476,6 +476,7 @@ end
 # ylims!(0, 5000)
 
 
+# include("main.jl")
 
 # spectrum = spectra[3]["MS1"]
 # plt(303)
