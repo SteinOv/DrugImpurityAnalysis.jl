@@ -73,5 +73,23 @@ In short, the program consists of five steps\
 
 ### Peak integration in detail
 
+1\) An ion extracted chromatogram (XIC) spectrum is created using one mass/charge (mz) or several mz values (depending on compounds.csv).\
+2\) The predicted retention time (RT) is calculated by {RT (in compounds.csv) * RT modifier}.\
+3\) The maximum between {RT - MAX_RT_DEVIATION} and {RT + MAX_RT_DEVIATION} is determined.\
+4\) Around this maximum, bounds are set (defined by MAX_PEAK_SCANS_DETERMINATION).\
+5\) Function determine_noise (see below) determines whether the interval is a peak or noise.\
+6.1\) If interval is noise, intensity is set to 0.\
+6.2\) If interval is a peak with no noise, \
+6.3\) If interval is a peak with noise, peak is processed further.\
+7\) Broader bounds are set for the further processing (defined by MAX_PEAK_SCANS_INTEGRATION).\
+8\) Function determine_overlap determines whether the peak overlaps with another peak.\
+9\) If overlap is detected, bounds of that side of the peak are set to the minimum between the two peaks.\
+10.1\) If overlap is defined on left in compounds.csv, closest noise right of peak is determined\
+10.2\) Otherwise closest noise left of peak is determined.\
+11\) For intervals defined by NOISE_INTERVAL_SIZE the closest noise interval is determined using the determine_noise function.\
+12\) The median of the noise is substracted from 
 
 
+#### Noise determination
+
+#### Overlap determination
