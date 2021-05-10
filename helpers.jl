@@ -9,7 +9,7 @@ retrieve_sample_name: Retrieves sample names for the spectra from the agilent .D
 
 """
 
-function RT_indices(spectrum, RT)
+function RT_indices(spectrum, RT_range)
 	"""Returns index range of given retention time range"""
 
 	# Only possible if Rt is sorted
@@ -17,7 +17,7 @@ function RT_indices(spectrum, RT)
 		error("Error: Retention time array is not in order")
 	end
 	
-	return [findfirst(i -> i >= RT[1], spectrum["Rt"]), findlast(i -> i <= RT[2], spectrum["Rt"])]
+	return [findfirst(i -> i >= RT_range[1], spectrum["Rt"]), findlast(i -> i <= RT_range[2], spectrum["Rt"])]
 end
 
 function filter_XIC(spectrum, mass_values)
@@ -62,7 +62,7 @@ function batch_import(pathin)
 
 	# Determine supported files
 	for i=1:length(files)
-		if lowercase(files[i][end-4:end]) == "mzxml" || lowercase(files[i][end-3:end]) == "cdf"
+		if length(files[i]) > length(".mzxml") && lowercase(files[i][end-4:end]) == "mzxml"
 			files_supported[i] = true
 		end
 	end

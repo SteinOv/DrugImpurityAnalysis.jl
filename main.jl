@@ -17,7 +17,9 @@ const MAX_RT_DEVIATION = 0.05
 
 # 40 scans is 0.1 minute
 const MAX_PEAK_SCANS_DETERMINATION = 20 # Used for differentiating peak from noise
-const MAX_PEAK_SCANS_INTEGRATION = 60 # Bounds for peak integration
+const MAX_PEAK_SCANS_INTEGRATION_LEFT = 40 # Bounds for peak integration (left)
+const MAX_PEAK_SCANS_INTEGRATION_RIGHT = 80 # Bounds for peak integration (right)
+
 
 const NOISE_INTERVAL_SIZE = 20 # Size of interval to search for noise
 const NOISE_CROSSINGS_FRACTION = 0.33
@@ -222,8 +224,8 @@ function integrate_peaks(spectrum, RT, mz_vals, overlap_RT=0)
 		end
 
 		# Broader bounds for integration
-		left_index = max_index - round(Int, MAX_PEAK_SCANS_INTEGRATION / 2)
-		right_index = max_index + round(Int, MAX_PEAK_SCANS_INTEGRATION / 2)
+		left_index = max_index - round(Int, MAX_PEAK_SCANS_INTEGRATION_LEFT)
+		right_index = max_index + round(Int, MAX_PEAK_SCANS_INTEGRATION_RIGHT)
 		
 		# Check for overlap and adjust bounds if overlap with other peak found
 		if overlap_RT > 0

@@ -6,7 +6,7 @@ include("helpers.jl")
 
 function display_distribution(compound)
     data_folder = joinpath(@__DIR__, "data")
-    subfolder = "tmp"
+    subfolder = "coca_caf_cal"
     pathin = joinpath(data_folder, subfolder)
     csvout = joinpath(pathin, "distribution.csv")
 
@@ -62,3 +62,11 @@ function display_distribution(compound)
 
     CSV.write(csvout, distribution)
 end 
+
+function manual_integration(spectrum, RT_range, mz_values)
+    "Manually integrate spectrum between RT range at chosen mz values"
+    index_left, index_right = RT_indices(spectrum, RT_range)
+    spectrum_XIC = filter_XIC(spectrum, mz_values)
+
+    return sum(spectrum_XIC[index_left : index_right])
+end
