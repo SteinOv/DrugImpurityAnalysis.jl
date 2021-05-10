@@ -8,7 +8,6 @@ using LightXML
 
 using BenchmarkTools
 
-include("manual_visualisation.jl")
 include("helpers.jl")
 
 const NORM_CONSTANT = 1000000
@@ -37,89 +36,88 @@ TODO
 function main()
 
 	# Specify path
-	# data_folder = "P:/Git/bachelor_project/data"
 	data_folder = joinpath(@__DIR__, "data")
-	subfolder = "200006"
+	subfolder = "coca_caf_cal"
 	pathin = joinpath(data_folder, subfolder)
 	csvout = joinpath(pathin, "impurity_profile.csv")
 
 	# Import spectra
-	load_time = @elapsed spectra = batch_import(pathin)
+	spectra = batch_import(pathin)
 	
-	# @btime begin # 4.193 s (8960667 allocations: 289.12 MiB) (folder: 200006)
-		# Import RT and mz info of valid compounds into DataFrame
-		compounds = CSV.read("compounds.csv", DataFrame)
-		filter!(row -> !(any(ismissing, (row.RT, row.mz)) || any((row.RT, row.mz) .== 0)), compounds)
+
+	# Import RT and mz info of valid compounds into DataFrame
+	compounds = CSV.read("compounds.csv", DataFrame)
+	filter!(row -> !(any(ismissing, (row.RT, row.mz)) || any((row.RT, row.mz) .== 0)), compounds)
 
 
-		# Create DataFrame for storing impurity profile (output)
-		compounds_in_prof = filter(row -> !(row.type_int == -10), compounds)
-		imp_profile = DataFrame()
-		insertcols!(imp_profile, :item_number => String[])
-		insertcols!(imp_profile, :filename => String[])
-		insertcols!(imp_profile, :folder => String[])
-		for name in compounds_in_prof.compound
-			insertcols!(imp_profile, Symbol(name) => Int32[])
-		end
+	# Create DataFrame for storing impurity profile (output)
+	compounds_in_prof = filter(row -> !(row.type_int == -10), compounds)
+	imp_profile = DataFrame()
+	insertcols!(imp_profile, :item_number => String[])
+	insertcols!(imp_profile, :filename => String[])
+	insertcols!(imp_profile, :folder => String[])
+	for name in compounds_in_prof.compound
+		insertcols!(imp_profile, Symbol(name) => Int32[])
+	end
 
-		# Analyse all spectra
-		sample_profile = zeros(Int32, size(compounds_in_prof, 1))
-		for i=1:length(spectra)
-			sample_metadata = Array{Any,1}(undef, 3)
+	# Analyse all spectra
+	sample_profile = zeros(Int32, size(compounds_in_prof, 1))
+	for i=1:length(spectra)
+		sample_metadata = Array{Any,1}(undef, 3)
 
-			println("Analysing spectrum $i...")
-			spectrum = spectra[i]["MS1"]
+		println("Analysing spectrum $i...")
+		spectrum = spectra[i]["MS1"]
 
-			# Save metadata
-			sample_metadata[1] = spectrum["Sample Name"][1]
-			sample_metadata[2] = spectrum["Filename"][1]
-			sample_metadata[3] = subfolder
+		# Save metadata
+		sample_metadata[1] = spectrum["Sample Name"][1]
+		sample_metadata[2] = spectrum["Filename"][1]
+		sample_metadata[3] = subfolder
 
-			# Determine intensity of major compound and RT shift (modifier)
-			major_intensity, RT_modifier, major_compound_name = process_major(compounds, spectrum)
+		# Determine intensity of major compound and RT shift (modifier)
+		major_intensity, RT_modifier, major_compound_name = process_major(compounds, spectrum)
 
-			# Check if major compounds sufficiently present
-			if major_intensity > 0
-				sample_profile[1] = NORM_CONSTANT
-			else
-				sample_profile[:] .= 0
-				push!(imp_profile, append!(sample_metadata, sample_profile))
-				println("Done (major compound not present)")
-				continue
-			end
-
-			# Integrate peaks of all compounds
-			for (j, row) in enumerate(eachrow(filter(row -> !(row.type_int in [-1, -10]), compounds)))
-				compound = row.compound
-				RT = row.RT * RT_modifier
-
-				# For tuples of mz values
-				mass_str = split(row.mz, ";")
-				mass_values = Array{Any,1}(undef, length(mass_str))
-				for (i, mass) in enumerate(mass_str)
-					if startswith(mass, "(")
-						mass = split(mass[2:end - 1], ",")
-						mass_values[i] = Tuple(([parse(Float32, sub_mass) for sub_mass in mass]))
-					else
-						mass_values[i] = parse(Float32, mass)
-					end	
-				end
-
-				overlap_RT = ismissing(row.overlap) ? 0 : row.overlap*RT_modifier # TODO support 2 overlap RT's
-
-				# Integrate all mz values
-				mass_integral = integrate_peaks(spectrum, RT, mass_values, overlap_RT)
-
-				# Determine final intensity for use in RT_deviation
-				intensity = determine_intensity(mass_integral)
-				
-				sample_profile[j + 1] = round(Int, intensity/major_intensity * NORM_CONSTANT)
-			end
-
+		# Check if major compound sufficiently present
+		if major_intensity > 0
+			sample_profile[1] = NORM_CONSTANT
+		else
+			sample_profile[:] .= 0
 			push!(imp_profile, append!(sample_metadata, sample_profile))
-			println("Done")
+			println("Done (major compound not present)")
+			continue
 		end
-	# end # @btime
+
+		# Integrate peaks of all compounds
+		for (j, row) in enumerate(eachrow(filter(row -> !(row.type_int in [-1, -10]), compounds)))
+			compound = row.compound
+			RT = row.RT * RT_modifier
+
+			# Parse mz values
+			mass_str = split(row.mz, ";")
+			mass_values = Array{Any,1}(undef, length(mass_str))
+			for (i, mass) in enumerate(mass_str)
+				if startswith(mass, "(")
+					mass = split(mass[2:end - 1], ",")
+					mass_values[i] = Tuple(([parse(Float32, sub_mass) for sub_mass in mass]))
+				else
+					mass_values[i] = parse(Float32, mass)
+				end	
+			end
+
+			overlap_RT = ismissing(row.overlap) ? 0 : row.overlap*RT_modifier # TODO support 2 overlap RT's or return error
+
+			# Integrate all mz values
+			mass_integral = integrate_mz_values(spectrum, RT, mass_values, overlap_RT)
+
+			# Determine final intensity
+			intensity = determine_intensity(mass_integral)
+			
+			sample_profile[j + 1] = round(Int, intensity/major_intensity * NORM_CONSTANT)
+		end
+
+		push!(imp_profile, append!(sample_metadata, sample_profile))
+		println("Done")
+	end
+
 	CSV.write(csvout, imp_profile)
 
 end
@@ -151,9 +149,9 @@ function process_major(compounds, spectrum)
 	RT = real_RT
 
 	# Determine cocaine/IS ratio
-	highest_mz_integral = integrate_peaks(spectrum, RT, highest_mass, 0)[1, 2]
+	highest_mz_integral = integrate_mz_values(spectrum, RT, highest_mass, 0)[1, 2]
 	IS_RT = IS_RT * RT_modifier
-	IS_highest_mz_integral = integrate_peaks(spectrum, IS_RT, IS_mass_vals[1], 0)[1, 2]
+	IS_highest_mz_integral = integrate_mz_values(spectrum, IS_RT, IS_mass_vals[1], 0)[1, 2]
 
 
 	# Ratio too low, no significant amount of major compound present 
@@ -167,7 +165,7 @@ function process_major(compounds, spectrum)
 
 
 	# Integrate all mz values
-	mass_integral = integrate_peaks(spectrum, RT, mass_vals, 0)
+	mass_integral = integrate_mz_values(spectrum, RT, mass_vals, 0)
 
 	# Required ratio between first mz IS and biggest mass major compound is defined in compounds.csv
 	highest_mass_i = findfirst(x -> x == highest_mass, mass_integral[:, 1])
@@ -194,9 +192,9 @@ function determine_intensity(mass_integral)
 end
 
 
-function integrate_peaks(spectrum, RT, mz_vals, overlap_RT=0)
+function integrate_mz_values(spectrum, RT, mz_vals, overlap_RT=0)
 	"""
-	Integrates peaks of specific compound
+	Integrates all mz values of specific compound
 
 	Returns matrix mass_integral, where row 1 are the mz values
 	and row 2 the corresponding intensities
@@ -210,75 +208,89 @@ function integrate_peaks(spectrum, RT, mz_vals, overlap_RT=0)
 	for (i, mz) in enumerate(mz_vals)
 		mass_integral[i, 1] = mz
 		spectrum_XIC = filter_XIC(spectrum, mz)
-		
-		peak, left_index, right_index, max_index = find_peak(RT_range_index, spectrum_XIC)
 
-		# No peak
-		if peak == -1
+		left_index, right_index, noise_median = determine_peak_info(spectrum_XIC, RT_range_index, overlap_RT)
+
+		if left_index == -1
+			# No peak
 			mass_integral[i, 2] = 0
-			continue
-		# Peak without noise
-		elseif peak == 0
-			mass_integral[i, 2] = sum(spectrum_XIC[left_index:right_index])
-			continue
-		end
-
-		# Broader bounds for integration
-		left_index = max_index - round(Int, MAX_PEAK_SCANS_INTEGRATION_LEFT)
-		right_index = max_index + round(Int, MAX_PEAK_SCANS_INTEGRATION_RIGHT)
-		
-		# Check for overlap and adjust bounds if overlap with other peak found
-		if overlap_RT > 0
-			overlap_RT_range = (overlap_RT - MAX_RT_DEVIATION, overlap_RT + MAX_RT_DEVIATION)
-			overlap_RT_range_index = RT_indices(spectrum, overlap_RT_range)
 		else
-			overlap_RT_range_index = 0
+			# Integrate peak
+			spectrum_part = spectrum_XIC[left_index:right_index]
+			replace!(x -> x < noise_median ? 0 : x - noise_median, spectrum_part)
+			mass_integral[i, 2] = sum(spectrum_part)
 		end
-		peak_end = determine_overlap(spectrum_XIC, left_index, right_index, max_index, overlap_RT_range_index)
-		left_index = peak_end[1] == -1 ? left_index : peak_end[1]
-		right_index = peak_end[2] == -1 ? right_index : peak_end[2]
-
-		# Search for closest noise, left if no overlap defined on left
-		direction = overlap_RT > 0 && overlap_RT < RT ? 1 : -1
-		noise_end = direction == -1 ? left_index : right_index + NOISE_INTERVAL_SIZE - 1
-		noise_start = noise_end - (NOISE_INTERVAL_SIZE - 1)
-		noise_median = Int
-		# rep_count = 0 # TEMP
-		while noise_start > 0 && noise_end < length(spectrum_XIC)
-			noise_median = determine_noise(spectrum_XIC[noise_start:noise_end], true)
-
-			# Noise found
-			if noise_median >= 0
-				break
-			end
-			
-			# rep_count += 1 # TEMP
-			noise_start += NOISE_INTERVAL_SIZE * direction
-			noise_end += NOISE_INTERVAL_SIZE * direction
-		end
-		# println("rep_count: $rep_count, mz: $mz, max_index: $max_index") # TEMP
-
-		if noise_median == -1
-			error("No noise found (mz: $mz)")
-		end
-
-		# Substract noise median around peak max
-		spectrum_part = spectrum_XIC[left_index:right_index]
-		replace!(x -> x < noise_median ? 0 : x - noise_median, spectrum_part)
-
-		# Find minimum left and right closest to max
-		max_index = findmax(spectrum_part)[2]
-		min_left = minimum(spectrum_part[1:max_index])
-		min_right = minimum(spectrum_part[max_index:end])
-		right_index = peak_end[2] == -1 ? findfirst(x -> x == min_right, spectrum_part[max_index:end]) + max_index - 1 : peak_end[2] - left_index + 1
-		left_index = peak_end[1] == -1 ? findlast(x -> x == min_left, spectrum_part[1:max_index]) : peak_end[1] - left_index + 1
-
-		# Integrate peak
-		mass_integral[i, 2] = sum(spectrum_part[left_index:right_index])
 
 	end
 
 	return mass_integral
+end
+
+function determine_peak_info(spectrum_XIC, RT_range_index, overlap_RT)
+	"""Determines peak range and noise median"""
+
+	peak, left_index, right_index, max_index = find_peak(RT_range_index, spectrum_XIC)
+	
+	# No peak
+	if peak == -1
+		return -1, -1, -1
+	# Peak without noise
+	elseif peak == 0
+		return left_index, right_index, 0
+	end
+
+	# Broader bounds for integration
+	left_index = max_index - round(Int, MAX_PEAK_SCANS_INTEGRATION_LEFT)
+	right_index = max_index + round(Int, MAX_PEAK_SCANS_INTEGRATION_RIGHT)
+	
+	# Check for overlap and adjust bounds if overlap with other peak found
+	if overlap_RT > 0
+		overlap_RT_range = (overlap_RT - MAX_RT_DEVIATION, overlap_RT + MAX_RT_DEVIATION)
+		overlap_RT_range_index = RT_indices(spectrum, overlap_RT_range)
+	else
+		overlap_RT_range_index = 0
+	end
+	peak_end = determine_overlap(spectrum_XIC, left_index, right_index, max_index, overlap_RT_range_index)
+	left_index = peak_end[1] == -1 ? left_index : peak_end[1]
+	right_index = peak_end[2] == -1 ? right_index : peak_end[2]
+
+	# Search for closest noise, left if no overlap defined on left
+	direction = overlap_RT > 0 && overlap_RT < RT ? 1 : -1
+	noise_end = direction == -1 ? left_index : right_index + NOISE_INTERVAL_SIZE - 1
+	noise_start = noise_end - (NOISE_INTERVAL_SIZE - 1)
+	noise_median = Int
+	# rep_count = 0 # TEMP
+	while noise_start > 0 && noise_end < length(spectrum_XIC)
+		noise_median = determine_noise(spectrum_XIC[noise_start:noise_end], true)
+
+		# Noise found
+		if noise_median >= 0
+			break
+		end
+		
+		# rep_count += 1 # TEMP
+		noise_start += NOISE_INTERVAL_SIZE * direction
+		noise_end += NOISE_INTERVAL_SIZE * direction
+	end
+	# println("rep_count: $rep_count, mz: $mz, max_index: $max_index") # TEMP
+
+	if noise_median == -1
+		error("No noise found (mz: $mz)")
+	end
+
+	# Substract noise median around peak max
+	spectrum_part = spectrum_XIC[left_index:right_index]
+	replace!(x -> x < noise_median ? 0 : x - noise_median, spectrum_part)
+	index_shift = left_index - 1
+
+	# Find minimum left and right closest to max
+	max_index = findmax(spectrum_part)[2]
+	min_left = minimum(spectrum_part[1:max_index])
+	min_right = minimum(spectrum_part[max_index:end])
+	right_index = peak_end[2] == -1 ? findfirst(x -> x == min_right, spectrum_part[max_index:end]) + max_index - 1 : peak_end[2] - left_index + 1
+	left_index = peak_end[1] == -1 ? findlast(x -> x == min_left, spectrum_part[1:max_index]) : peak_end[1] - left_index + 1
+
+	return left_index + index_shift, right_index + index_shift, noise_median
 end
 
 
