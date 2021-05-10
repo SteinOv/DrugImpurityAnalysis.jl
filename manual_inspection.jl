@@ -9,8 +9,7 @@ manual_integration: Manually integrates spectrum between chosen RT and mz values
 
 """
 
-include("main.jl")
-include("helpers.jl")
+# include("main.jl")
 
 function plt(mass=0, RT=0, RT_range_size=0.5)
 	"""Plot spectrum of given mass
@@ -99,7 +98,7 @@ function mass_ratios(compound, spectra=spectra, compounds=compounds)
             if RT_modifier == 0
                 continue
             end
-            mass_intensity = integrate_peaks(spectrum, RT * RT_modifier, mass_vals)
+            mass_intensity = integrate_mz_values(spectrum, RT * RT_modifier, mass_vals)
             norm = mass_intensity[1, 2]
     
             if norm == 0
@@ -177,7 +176,7 @@ function display_distribution(compound)
         sample_metadata[3] = subfolder
 
         # Integrate peaks
-        mass_integral = integrate_peaks(spectrum, RT, mass_values)
+        mass_integral = integrate_mz_values(spectrum, RT, mass_values)
         push!(distribution, append!(sample_metadata, zeros(length(mass_values))))
         for j=1:length(mass_values)
             distribution[i, Symbol(string(mass_integral[j, 1]))] = mass_integral[j, 2]
@@ -189,9 +188,49 @@ function display_distribution(compound)
 end 
 
 function manual_integration(spectrum, RT_range, mz_values)
-    "Manually integrate spectrum between RT range at chosen mz values"
+    """Manually integrate spectrum between RT range at chosen mz values"""
     index_left, index_right = RT_indices(spectrum, RT_range)
     spectrum_XIC = filter_XIC(spectrum, mz_values)
 
     return sum(spectrum_XIC[index_left : index_right])
 end
+
+
+function visualize_peak_range(spectrum, compound_name, mz, predicted_RT=0)
+    """Visualize determined peak range"""
+    PLOT_EXTRA_SCANS = 40
+
+    # Read compounds.csv
+	compounds = CSV.read("compounds.csv", DataFrame)
+	filter!(row -> !(any(ismissing, (row.RT, row.mz)) || any((row.RT, row.mz) .== 0)), compounds)
+
+    # Retrieve row of compound in compounds.csv
+    compound = filter(row -> row.compound == compound_name, compounds)
+
+    # Determine predicted RT
+    if predicted_RT == 0
+        RT_modifier = process_major(compounds, spectrum)[2]
+        predicted_RT = compound.RT[1] * RT_modifier
+    end
+
+    # Read overlap_RT and determine RT (index) range
+    overlap_RT = ismissing(compound.overlap[1]) ? 0 : compound.overlap[1] * RT_modifier # TODO support 2 overlap RT's or return error
+    RT_range = (predicted_RT - MAX_RT_DEVIATION, predicted_RT + MAX_RT_DEVIATION)
+	RT_range_index = RT_indices(spectrum, RT_range)
+
+    # Determine peak range and baseline (noise median)
+    spectrum_XIC = filter_XIC(spectrum, mz)
+    left_index, right_index, noise_median = determine_peak_info(spectrum_XIC, RT_range_index, overlap_RT)
+
+    plot(1:length(spectrum_XIC), spectrum_XIC, xlims=(left_index - PLOT_EXTRA_SCANS, right_index + PLOT_EXTRA_SCANS), xlabel="scan number", ylabel="intensity")
+    vline!([left_index, right_index], linestyle=:dash)
+    hline!([noise_median], linestyle=:dash)
+    
+end
+
+"""
+spectrum = spectra[9]["MS1"]
+compound = "caffeine"
+mz = 194
+visualize_peak_range(spectrum, compound, mz)
+"""
