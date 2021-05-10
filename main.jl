@@ -130,14 +130,14 @@ function process_major(compounds, spectrum)
 	major_compound_name = major_compound.compound[1]
 	RT = major_compound.RT[1]
 	IS_RT = internal_standard.RT[1]
-	IS_major_ratio = parse(Float32, internal_standard.ratio[1])[1]
+	major_IS_ratio = parse(Float32, internal_standard.ratio[1])[1]
 
 	mass_vals = split(major_compound.mz[1], ";")
 	mass_vals = [parse(Float32, mass) for mass in mass_vals]
 	IS_mass_vals = split(internal_standard.mz[1], ";")
 	IS_mass_vals = [parse(Float32, mass) for mass in IS_mass_vals]
 
-	# Find peak using highest mz value within +/- 1 min of known RT
+	# Find peak using highest mz value within +/- 1 min of predicted RT
 	highest_mass = maximum(mass_vals)
 	RT_range = [RT - 1, RT + 1]
 	RT_range_index = RT_indices(spectrum, RT_range)
@@ -148,15 +148,18 @@ function process_major(compounds, spectrum)
 	RT_modifier = round(real_RT / RT, digits = 3)
 	RT = real_RT
 
-	# Determine IS/cocaine ratio
+	# Determine cocaine/IS ratio
 	highest_mz_integral = integrate_peaks(spectrum, RT, highest_mass, 0)[1, 2]
 	IS_RT = IS_RT * RT_modifier
 	IS_highest_mz_integral = integrate_peaks(spectrum, IS_RT, IS_mass_vals[1], 0)[1, 2]
-	# Ratio too high, no significant amount of major compound present 
-	if IS_highest_mz_integral / highest_mz_integral > IS_major_ratio || highest_mz_integral == 0
+
+
+	# Ratio too low, no significant amount of major compound present 
+	if highest_mz_integral / IS_highest_mz_integral < major_IS_ratio || highest_mz_integral == 0
 		return (0, RT_modifier, major_compound_name)
-	elseif IS_highest_mz_integral == 0
-		error("Cocaine peak detected, but internal standard not detected")
+	elseif IS_highest_mz_integral == 0 && highest_mz_integral != 0
+		@warn "Major compound detected, but internal standard not detected"
+		return (0, RT_modifier, major_compound_name)
 	end
 
 
@@ -223,7 +226,13 @@ function integrate_peaks(spectrum, RT, mz_vals, overlap_RT=0)
 		right_index = max_index + round(Int, MAX_PEAK_SCANS_INTEGRATION / 2)
 		
 		# Check for overlap and adjust bounds if overlap with other peak found
-		peak_end = determine_overlap(spectrum_XIC, left_index, right_index, max_index, overlap_RT)
+		if overlap_RT > 0
+			overlap_RT_range = (overlap_RT - MAX_RT_DEVIATION, overlap_RT + MAX_RT_DEVIATION)
+			overlap_RT_range_index = RT_indices(spectrum, overlap_RT_range)
+		else
+			overlap_RT_range_index = 0
+		end
+		peak_end = determine_overlap(spectrum_XIC, left_index, right_index, max_index, overlap_RT_range_index)
 		left_index = peak_end[1] == -1 ? left_index : peak_end[1]
 		right_index = peak_end[2] == -1 ? right_index : peak_end[2]
 
@@ -314,18 +323,16 @@ end
 
 
 
-function determine_overlap(spectrum_XIC, left_index, right_index, max_index, overlap_RT)
+function determine_overlap(spectrum_XIC, left_index, right_index, max_index, overlap_RT_range_index)
 	"""
-	Determines whether peak has overlap
-	Returns index where overlap starts if overlap detected.
+	Determines whether peak has overlap.
+	Returns index of minimum between peak and overlapping peak if overlap present.
 	"""
 	# peak_end[1] is overlap on left, peak_end[2] is overlap on right
 	peak_end = Int32[-1, -1]
 
 	# Overlap defined in compounds.csv # TODO, for now only supports one RT
-	if overlap_RT > 0
-		overlap_RT_range = [overlap_RT - MAX_RT_DEVIATION, overlap_RT + MAX_RT_DEVIATION]
-		overlap_RT_range_index = RT_indices(spectrum, overlap_RT_range)
+	if overlap_RT_range_index != 0
 		overlap_peak, overlap_left_index, overlap_right_index, overlap_max_index = find_peak(overlap_RT_range_index, spectrum_XIC)
 
 		# Peak exists
