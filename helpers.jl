@@ -42,7 +42,7 @@ function filter_XIC(spectrum, mass_values)
 	end
 
 	# Create XIC spectrum
-	spectrum_XIC = @MVector zeros(Int, size(spectrum["Mz_values"], 1))
+	spectrum_XIC = zeros(Int, size(spectrum["Mz_values"], 1))
 
 	# Filter spectrum using stored indices
 	for I in indices

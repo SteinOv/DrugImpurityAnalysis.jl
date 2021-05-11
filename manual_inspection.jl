@@ -222,6 +222,10 @@ function visualize_peak_range(spectrum, compound_name, mz, predicted_RT=0)
     spectrum_XIC = filter_XIC(spectrum, mz)
     left_index, right_index, noise_median = determine_peak_info(spectrum_XIC, RT_range_index, overlap_RT)
 
+    if left_index == -1
+        plot(spectrum_XIC, xlims=(RT_range_index[1], RT_range_index[2]))
+    end
+
     secondary_ylims = max(spectrum_XIC[left_index] * 5, spectrum_XIC[right_index] * 5, 5000)
 
     plot(spectrum_XIC, xlims=(left_index - PLOT_EXTRA_SCANS, right_index + PLOT_EXTRA_SCANS), xlabel="scan number", ylabel="intensity", label=compound_name, left_margin = 5Plots.mm, right_margin = 15Plots.mm, grid=:off)
@@ -233,8 +237,8 @@ function visualize_peak_range(spectrum, compound_name, mz, predicted_RT=0)
 end
 
 """
-spectrum = spectra[9]["MS1"]
+spectrum = spectra[1]["MS1"]
 compound = "caffeine"
 mz = 194
-visualize_peak_range(spectrum, compound, mz)
+@time visualize_peak_range(spectrum, compound, mz)
 """

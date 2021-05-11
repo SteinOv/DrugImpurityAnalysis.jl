@@ -3,7 +3,6 @@ using Plots
 using Printf
 using CSV
 using DataFrames
-using StaticArrays
 using LightXML
 
 using BenchmarkTools
@@ -39,6 +38,7 @@ function main()
 	# Specify path
 	data_folder = joinpath(@__DIR__, "data")
 	subfolder = "coca_caf_cal"
+	# subfolder = "tmp"
 	pathin = joinpath(data_folder, subfolder)
 	csvout = joinpath(pathin, "impurity_profile.csv")
 
@@ -499,10 +499,11 @@ end
 
 
 # include("main.jl")
-
+# @time begin
 # spectrum = spectra[3]["MS1"]
 # plt(303)
 # plt()
-# spectrum = spectra[33]["MS1"]
+# spectrum = spectra[4]["MS1"]
 # plt(77)
 # plt()
+# end
