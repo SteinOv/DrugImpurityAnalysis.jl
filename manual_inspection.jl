@@ -222,9 +222,13 @@ function visualize_peak_range(spectrum, compound_name, mz, predicted_RT=0)
     spectrum_XIC = filter_XIC(spectrum, mz)
     left_index, right_index, noise_median = determine_peak_info(spectrum_XIC, RT_range_index, overlap_RT)
 
-    plot(1:length(spectrum_XIC), spectrum_XIC, xlims=(left_index - PLOT_EXTRA_SCANS, right_index + PLOT_EXTRA_SCANS), xlabel="scan number", ylabel="intensity")
-    vline!([left_index, right_index], linestyle=:dash)
-    hline!([noise_median], linestyle=:dash)
+    secondary_ylims = max(spectrum_XIC[left_index] * 5, spectrum_XIC[right_index] * 5, 5000)
+
+    plot(spectrum_XIC, xlims=(left_index - PLOT_EXTRA_SCANS, right_index + PLOT_EXTRA_SCANS), xlabel="scan number", ylabel="intensity", label=compound_name, left_margin = 5Plots.mm, right_margin = 15Plots.mm, grid=:off)
+    vline!([left_index, right_index], linestyle=:dash, label="peak cutoffs")
+    hline!([noise_median], linestyle=:dash, label="baseline ($noise_median)")
+    plot!(twinx(), spectrum_XIC, xlims=(left_index - PLOT_EXTRA_SCANS, right_index + 
+                 PLOT_EXTRA_SCANS), ylims=(0, secondary_ylims), linestyle=:dot, ylabel="intensity (zoomed)", label="", grid=:off, show)
     
 end
 
