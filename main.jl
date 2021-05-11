@@ -9,6 +9,7 @@ using LightXML
 using BenchmarkTools
 
 include("helpers.jl")
+include("manual_inspection.jl")
 
 const NORM_CONSTANT = 1000000
 const MAX_MASS_DEVIATION = 0.5
