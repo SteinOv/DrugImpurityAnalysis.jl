@@ -38,7 +38,6 @@ function main()
 	# Specify path
 	data_folder = joinpath(@__DIR__, "data")
 	subfolder = "coca_caf_cal"
-	# subfolder = "tmp"
 	pathin = joinpath(data_folder, subfolder)
 	csvout = joinpath(pathin, "impurity_profile.csv")
 
@@ -57,8 +56,8 @@ function main()
 	insertcols!(imp_profile, :item_number => String[])
 	insertcols!(imp_profile, :filename => String[])
 	insertcols!(imp_profile, :folder => String[])
-	for name in compounds_in_prof.compound
-		insertcols!(imp_profile, Symbol(name) => Int32[])
+	for compound_name in compounds_in_prof.compound
+		insertcols!(imp_profile, Symbol(compound_name) => Int32[])
 	end
 
 	# Analyse all spectra
@@ -79,7 +78,8 @@ function main()
 
 		# Check if major compound sufficiently present
 		if major_intensity > 0
-			sample_profile[1] = NORM_CONSTANT
+			# sample_profile[1] = NORM_CONSTANT
+			sample_profile[1] = major_intensity
 		else
 			sample_profile[:] .= 0
 			push!(imp_profile, append!(sample_metadata, sample_profile))
@@ -112,7 +112,8 @@ function main()
 			# Determine final intensity
 			intensity = determine_intensity(mass_integral)
 			
-			sample_profile[j + 1] = round(Int, intensity/major_intensity * NORM_CONSTANT)
+			# sample_profile[j + 1] = round(Int, intensity/major_intensity * NORM_CONSTANT)
+			sample_profile[j + 1] = intensity
 		end
 
 		push!(imp_profile, append!(sample_metadata, sample_profile))
@@ -210,7 +211,7 @@ function integrate_mz_values(spectrum, RT, mz_vals, overlap_RT=0)
 		mass_integral[i, 1] = mz
 		spectrum_XIC = filter_XIC(spectrum, mz)
 
-		left_index, right_index, noise_median = determine_peak_info(spectrum_XIC, RT_range_index, overlap_RT)
+		left_index, right_index, noise_median = determine_peak_range(spectrum_XIC, RT_range_index, RT, overlap_RT)
 
 		if left_index == -1
 			# No peak
@@ -227,7 +228,7 @@ function integrate_mz_values(spectrum, RT, mz_vals, overlap_RT=0)
 	return mass_integral
 end
 
-function determine_peak_info(spectrum_XIC, RT_range_index, overlap_RT)
+function determine_peak_range(spectrum_XIC, RT_range_index, RT, overlap_RT)
 	"""Determines peak range and noise median"""
 
 	peak, left_index, right_index, max_index = find_peak(RT_range_index, spectrum_XIC)
@@ -281,17 +282,37 @@ function determine_peak_info(spectrum_XIC, RT_range_index, overlap_RT)
 
 	# Substract noise median around peak max
 	spectrum_part = spectrum_XIC[left_index:right_index]
-	replace!(x -> x < noise_median ? 0 : x - noise_median, spectrum_part)
 	index_shift = left_index - 1
+
+	left_index, right_index = determine_peak_ends(spectrum_part, noise_median, peak_end, index_shift)
+
+	# Redetermine noise on left, so baseline is based on noise as close to peak as possible
+	if peak_end[1] == -1
+		left_part = spectrum_XIC[left_index - NOISE_INTERVAL_SIZE : left_index]
+		new_noise_median = determine_noise(left_part)
+		if new_noise_median != -1 && new_noise_median < noise_median
+			noise_median = new_noise_median
+			left_index, right_index = determine_peak_ends(spectrum_part, noise_median, peak_end, index_shift)
+		end
+	end
+
+	return left_index, right_index, noise_median
+end
+
+function determine_peak_ends(spectrum_part, noise_median, peak_end, index_shift=0)
+	"""Determines left and right index of peak"""
+
+	spectrum_part = replace(x -> x < noise_median ? 0 : x - noise_median, spectrum_part)
+	
 
 	# Find minimum left and right closest to max
 	max_index = findmax(spectrum_part)[2]
 	min_left = minimum(spectrum_part[1:max_index])
 	min_right = minimum(spectrum_part[max_index:end])
-	right_index = peak_end[2] == -1 ? findfirst(x -> x == min_right, spectrum_part[max_index:end]) + max_index - 1 : peak_end[2] - left_index + 1
-	left_index = peak_end[1] == -1 ? findlast(x -> x == min_left, spectrum_part[1:max_index]) : peak_end[1] - left_index + 1
+	right_index = peak_end[2] == -1 ? findfirst(x -> x == min_right, spectrum_part[max_index:end]) + max_index - 1 + index_shift : peak_end[2]
+	left_index = peak_end[1] == -1 ? findlast(x -> x == min_left, spectrum_part[1:max_index]) + index_shift : peak_end[1]
 
-	return left_index + index_shift, right_index + index_shift, noise_median
+	return left_index, right_index
 end
 
 
@@ -434,76 +455,3 @@ function determine_noise(spectrum_part, use_median=false)
 end
 
 # main()
-
-
-# using LinearAlgebra, SparseArrays
-
-# function AsLS(y, lambda, p)
-# 	y = vec(y)
-
-# 	# Estimate baseline with asymmetric least squares
-# 	m = length(y)
-# 	d = zeros(m,m)
-# 	d[diagind(d)] .= 1
-# 	D = diff(diff(d, dims = 1),dims =1)
-# 	w = ones(m, 1)
-# 	z = []
-
-# 	for it = 1:10
-# 		W = spdiagm(m, m, 0 => vec(w))
-# 	    C = cholesky(W + lambda * D' * D)
-# 	    z = C.U \ (C.U' \ (w .* y))
-# 	    w = p * (y .> z) + (1 - p) * (y .< z)
-# 	end
-
-# 	return z
-# end
-
-# # Cinnamoylcocaine
-# spectrum = spectra[33]["MS1"]
-# spectrum_XIC = filter_XIC(spectrum, (82, 182, 83, 96, 94))[2075:2270]
-# x = spectrum["Rt"][2075:2270]
-
-# baseline = AsLS(spectrum_XIC, 20000, 0.01)
-# plot(x, spectrum_XIC)
-# plot!(x, baseline)
-# ylims!(0, 10000)
-# xlims!(7, 7.5)
-
-# # Norcocaine
-# spectrum = spectra[33]["MS1"]
-# spectrum_XIC = filter_XIC(spectrum, 168)[1798:1890]
-# x = spectrum["Rt"][1798:1890]
-
-# baseline = AsLS(spectrum_XIC, 10000, 0.01)
-# plot(x, spectrum_XIC)
-# plot!(x, baseline)
-# # ylims!(0, 10000)
-# # xlims!(7, 7.5)
-
-
-
-# plt((168,68,136), 6.5)
-# plt!((168), 6.5)
-# plt!((68,136), 6.5)
-
-# # High norcocaine
-# spectrum = spectra[17]["MS1"]
-# ylims!(0, 100000)
-# xlims!(6.25, 6.7)
-
-# # Low norcocaine
-# spectrum = spectra[29]["MS1"]
-# xlims!(6.35, 6.45)
-# ylims!(0, 5000)
-
-
-# include("main.jl")
-# @time begin
-# spectrum = spectra[3]["MS1"]
-# plt(303)
-# plt()
-# spectrum = spectra[4]["MS1"]
-# plt(77)
-# plt()
-# end
