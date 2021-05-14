@@ -198,7 +198,7 @@ end
 
 function visualize_peak_range(spectrum, compound_name, mz, predicted_RT=0)
     """Visualize determined peak range"""
-    PLOT_EXTRA_SCANS = 40
+    PLOT_EXTRA_SCANS = 60
 
     # Read compounds.csv
 	compounds = CSV.read("compounds.csv", DataFrame)
@@ -220,25 +220,29 @@ function visualize_peak_range(spectrum, compound_name, mz, predicted_RT=0)
 
     # Determine peak range and baseline (noise median)
     spectrum_XIC = filter_XIC(spectrum, mz)
-    left_index, right_index, noise_median = determine_peak_info(spectrum_XIC, RT_range_index, overlap_RT)
+    left_index, right_index, noise_median = determine_peak_range(spectrum_XIC, RT_range_index, compound.RT[1], overlap_RT)
 
-    if left_index == -1
-        plot(spectrum_XIC, xlims=(RT_range_index[1], RT_range_index[2]))
+    if left_index == -1 || maximum(spectrum_XIC[left_index : right_index]) <= 0
+        return plot(spectrum_XIC, xlims=(RT_range_index[1], RT_range_index[2]), ylims=(0,
+                     maximum(spectrum_XIC[RT_range_index[1] : RT_range_index[2]]) * 1.1), 
+                          xlabel="scan number", ylabel="intensity", label=compound_name)
     end
 
-    secondary_ylims = max(spectrum_XIC[left_index] * 5, spectrum_XIC[right_index] * 5, 5000)
+    secondary_ylims = max(spectrum_XIC[left_index] * 5, spectrum_XIC[right_index] * 5, 4000)
+    _xlims = (left_index - PLOT_EXTRA_SCANS, right_index + PLOT_EXTRA_SCANS)
 
-    plot(spectrum_XIC, xlims=(left_index - PLOT_EXTRA_SCANS, right_index + PLOT_EXTRA_SCANS), xlabel="scan number", ylabel="intensity", label=compound_name, left_margin = 5Plots.mm, right_margin = 15Plots.mm, grid=:off)
+    plot(spectrum_XIC, xlims=_xlims, ylims=(0, maximum(spectrum_XIC[left_index : right_index]) * 1.1), 
+                       xlabel="scan number", ylabel="intensity", label=compound_name, left_margin = 5Plots.mm, legend=:topleft,
+                                        right_margin = 15Plots.mm, grid=:off, title="Filename: $(spectrum["Filename"][1]), \nSample Name: $(spectrum["Sample Name"][1])")
     vline!([left_index, right_index], linestyle=:dash, label="peak cutoffs")
-    hline!([noise_median], linestyle=:dash, label="baseline ($noise_median)")
-    plot!(twinx(), spectrum_XIC, xlims=(left_index - PLOT_EXTRA_SCANS, right_index + 
-                 PLOT_EXTRA_SCANS), ylims=(0, secondary_ylims), linestyle=:dot, ylabel="intensity (zoomed)", label="", grid=:off, show)
+    hline!([noise_median], linestyle=:dash, label="baseline ($noise_median)", seriescolor=:green)
+
+    if maximum(spectrum_XIC[left_index : right_index]) / secondary_ylims > 5
+        plot!(twinx(), spectrum_XIC, xlims=_xlims,
+            ylims=(0, secondary_ylims), linestyle=:dot, ylabel="intensity (zoomed)", label="", grid=:off)
+        hline!(twinx(), [noise_median], xlims=_xlims, linestyle=:dot, ylims=(0, secondary_ylims), label="", seriescolor=:green, xaxis=:false, grid=:off)
+    end
     
+    return plot!()
 end
 
-"""
-spectrum = spectra[1]["MS1"]
-compound = "caffeine"
-mz = 194
-@time visualize_peak_range(spectrum, compound, mz)
-"""
