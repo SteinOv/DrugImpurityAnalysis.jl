@@ -35,8 +35,6 @@ function plt(mass=0, RT=0, RT_range_size=0.5)
 	end
 
 	if RT > 0
-		add_left = 100
-		add_right = 100
 		plot(spectrum["Rt"][RT_range_index[1]:RT_range_index[2]], spectrum_XIC[(RT_range_index[1]):RT_range_index[2]])
 	else
 		plot(spectrum["Rt"], spectrum_XIC)
@@ -67,8 +65,6 @@ function plt!(mass=0, RT=0, RT_range_size=0.5)
 	end
 
 	if RT > 0
-		add_left = 100
-		add_right = 100
 		plot!(spectrum["Rt"][RT_range_index[1]:RT_range_index[2]], spectrum_XIC[(RT_range_index[1]):RT_range_index[2]])
 	else
 		plot!(spectrum["Rt"], spectrum_XIC)
@@ -196,7 +192,7 @@ function manual_integration(spectrum, RT_range, mz_values)
 end
 
 
-function visualize_peak_range(spectrum, compound_name, mz, predicted_RT=0)
+function visualize_peak_range(spectrum, compound_name, mz, secondary_ylims=0, predicted_RT=0)
     """Visualize determined peak range"""
     PLOT_EXTRA_SCANS = 60
 
@@ -207,9 +203,10 @@ function visualize_peak_range(spectrum, compound_name, mz, predicted_RT=0)
     # Retrieve row of compound in compounds.csv
     compound = filter(row -> row.compound == compound_name, compounds)
 
+    RT_modifier = process_major(compounds, spectrum)[2]
+
     # Determine predicted RT
     if predicted_RT == 0
-        RT_modifier = process_major(compounds, spectrum)[2]
         predicted_RT = compound.RT[1] * RT_modifier
     end
 
@@ -227,22 +224,27 @@ function visualize_peak_range(spectrum, compound_name, mz, predicted_RT=0)
                      maximum(spectrum_XIC[RT_range_index[1] : RT_range_index[2]]) * 1.1), 
                           xlabel="scan number", ylabel="intensity", label=compound_name)
     end
-
-    secondary_ylims = max(spectrum_XIC[left_index] * 5, spectrum_XIC[right_index] * 5, 4000)
+    if secondary_ylims == 0
+        secondary_ylims = max(spectrum_XIC[left_index] * 5, spectrum_XIC[right_index] * 5, 4000)
+    end
     _xlims = (left_index - PLOT_EXTRA_SCANS, right_index + PLOT_EXTRA_SCANS)
 
     plot(spectrum_XIC, xlims=_xlims, ylims=(0, maximum(spectrum_XIC[left_index : right_index]) * 1.1), 
-                       xlabel="scan number", ylabel="intensity", label=compound_name, left_margin = 5Plots.mm, legend=:topleft,
-                                        right_margin = 15Plots.mm, grid=:off, title="Filename: $(spectrum["Filename"][1]), \nSample Name: $(spectrum["Sample Name"][1])")
+               xlabel="scan number", ylabel="intensity", label=compound_name, left_margin = 5Plots.mm, 
+                                                legend=:topleft,right_margin = 18Plots.mm, grid=:off)
+    plot!(title="Filename: $(spectrum["Filename"][1]) \nSample Name: $(spectrum["Sample Name"][1]) \nmz: $mz", titlefontsize=7)
     vline!([left_index, right_index], linestyle=:dash, label="peak cutoffs")
     hline!([noise_median], linestyle=:dash, label="baseline ($noise_median)", seriescolor=:green)
 
-    if maximum(spectrum_XIC[left_index : right_index]) / secondary_ylims > 5
+    if maximum(spectrum_XIC[left_index : right_index]) / secondary_ylims > 2.5
+
+        hline!(twinx(), [noise_median], xlims=_xlims, linestyle=:dot, ylims=(0, secondary_ylims), label="", seriescolor=:green, xaxis=:false)
+
         plot!(twinx(), spectrum_XIC, xlims=_xlims,
-            ylims=(0, secondary_ylims), linestyle=:dot, ylabel="intensity (zoomed)", label="", grid=:off)
-        hline!(twinx(), [noise_median], xlims=_xlims, linestyle=:dot, ylims=(0, secondary_ylims), label="", seriescolor=:green, xaxis=:false, grid=:off)
+        ylims=(0, secondary_ylims), linestyle=:dot, ylabel="intensity (zoomed)", label="", grid=:off)
+        # plot!(linestyle=:dot)
     end
-    
+    #, seriescolor=RGB(160/255, 193/255, 249/255)
     return plot!()
 end
 

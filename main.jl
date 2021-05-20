@@ -10,7 +10,7 @@ using BenchmarkTools
 include("helpers.jl")
 include("manual_inspection.jl")
 
-const NORM_CONSTANT = 1000000
+const NORM_CONSTANT = 10000
 const MAX_MASS_DEVIATION = 0.5
 const MAX_RT_DEVIATION = 0.05
 
@@ -113,7 +113,8 @@ function main()
 			intensity = determine_intensity(mass_integral)
 			
 			# sample_profile[j + 1] = round(Int, intensity/major_intensity * NORM_CONSTANT)
-			sample_profile[j + 1] = intensity
+			# sample_profile[j + 1] = round(Int, intensity/major_intensity * NORM_CONSTANT) / NORM_constant #TEMP
+			sample_profile[j + 1] = intensity #TEMP
 		end
 
 		push!(imp_profile, append!(sample_metadata, sample_profile))
@@ -177,7 +178,8 @@ function process_major(compounds, spectrum)
 
 
 	# Determine final intensity for use in RT_deviation
-	intensity = determine_intensity(mass_integral)
+	# intensity = determine_intensity(mass_integral)
+	intensity = determine_intensity(mass_integral, :end) #TEMP
 
 	
 
@@ -185,12 +187,18 @@ function process_major(compounds, spectrum)
 end
 
 
-function determine_intensity(mass_integral)
+function determine_intensity(mass_integral, mz_index=0)
 	"""
 	Determines final intensity for use in ratios
 	Just sums all integrals for now
 	"""
-	return sum(mass_integral[:, 2])
+	if mz_index == 0
+		return sum(mass_integral[:, 2])
+	elseif mz_index == :end
+		return mass_integral[end, 2]
+	else
+		return mass_integral[mz_index, 2]
+	end
 end
 
 
@@ -221,6 +229,7 @@ function integrate_mz_values(spectrum, RT, mz_vals, overlap_RT=0)
 			spectrum_part = spectrum_XIC[left_index:right_index]
 			replace!(x -> x < noise_median ? 0 : x - noise_median, spectrum_part)
 			mass_integral[i, 2] = sum(spectrum_part)
+			# mass_integral[i, 2] = maximum(spectrum_part) #TEMP
 		end
 
 	end
@@ -261,7 +270,6 @@ function determine_peak_range(spectrum_XIC, RT_range_index, RT, overlap_RT)
 	noise_end = direction == -1 ? left_index : right_index + NOISE_INTERVAL_SIZE - 1
 	noise_start = noise_end - (NOISE_INTERVAL_SIZE - 1)
 	noise_median = Int
-	# rep_count = 0 # TEMP
 	while noise_start > 0 && noise_end < length(spectrum_XIC)
 		noise_median = determine_noise(spectrum_XIC[noise_start:noise_end], true)
 
@@ -270,26 +278,23 @@ function determine_peak_range(spectrum_XIC, RT_range_index, RT, overlap_RT)
 			break
 		end
 		
-		# rep_count += 1 # TEMP
 		noise_start += NOISE_INTERVAL_SIZE * direction
 		noise_end += NOISE_INTERVAL_SIZE * direction
 	end
-	# println("rep_count: $rep_count, mz: $mz, max_index: $max_index") # TEMP
 
 	if noise_median == -1
 		error("No noise found (mz: $mz)")
 	end
 
-	# Substract noise median around peak max
+	# Substract noise median around peak max and find closest intensities of zero
 	spectrum_part = spectrum_XIC[left_index:right_index]
 	index_shift = left_index - 1
-
 	left_index, right_index = determine_peak_ends(spectrum_part, noise_median, peak_end, index_shift)
 
 	# Redetermine noise on left, so baseline is based on noise as close to peak as possible
 	if peak_end[1] == -1
 		left_part = spectrum_XIC[left_index - NOISE_INTERVAL_SIZE : left_index]
-		new_noise_median = determine_noise(left_part)
+		new_noise_median = determine_noise(left_part, true)
 		if new_noise_median != -1 && new_noise_median < noise_median
 			noise_median = new_noise_median
 			left_index, right_index = determine_peak_ends(spectrum_part, noise_median, peak_end, index_shift)
