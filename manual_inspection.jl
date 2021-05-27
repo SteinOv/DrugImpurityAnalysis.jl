@@ -11,22 +11,23 @@ manual_integration: Manually integrates spectrum between chosen RT and mz values
 
 # include("main.jl")
 
+"""Plot spectrum of given mass
+plt((mass), (RT), (RT_deviation))
+
+mass: XIC at specific mass
+mass = 0: Spectrum not filtered
+
+RT given: Zooms in around given RT
+RT = 0: Shows complete RT spectrum
+RT_range_size: Deviation around RT (default 0.5)
+"""
 function plt(mass=0, RT=0, RT_range_size=0.5)
-	"""Plot spectrum of given mass
-	plt((mass), (RT), (RT_deviation))
 
-	mass: XIC at specific mass
-	mass = 0: Spectrum not filtered
-
-	RT given: Zooms in around given RT
-	RT = 0: Shows complete RT spectrum
-	RT_range_size: Deviation around RT (default 0.5)
-	"""
 
 	# TODO gives error at start and end
 
 	RT_range = [RT - RT_range_size, RT + RT_range_size]
-	RT_range_index = RT_indices(spectrum, RT_range)
+	RT_range_index = RT_to_scans(spectrum, RT_range)
 
 	if mass != 0
 		spectrum_XIC = filter_XIC(spectrum, mass)
@@ -41,22 +42,22 @@ function plt(mass=0, RT=0, RT_range_size=0.5)
 	end
 end
 
+
+"""Plot spectrum of given mass over previous spectrum
+plt((mass), (RT), (RT_deviation))
+
+mass: XIC at specific mass
+mass = 0: Spectrum not filtered
+
+RT given: Zooms in around given RT
+RT = 0: Shows complete RT spectrum
+RT_range_size: Deviation around RT (default 0.5)
+"""
 function plt!(mass=0, RT=0, RT_range_size=0.5)
-	"""Plot spectrum of given mass over previous spectrum
-	plt((mass), (RT), (RT_deviation))
-
-	mass: XIC at specific mass
-	mass = 0: Spectrum not filtered
-
-	RT given: Zooms in around given RT
-	RT = 0: Shows complete RT spectrum
-	RT_range_size: Deviation around RT (default 0.5)
-	"""
-
 	# TODO gives error at start and end
 
 	RT_range = [RT - RT_range_size, RT + RT_range_size]
-	RT_range_index = RT_indices(spectrum, RT_range)
+	RT_range_index = RT_to_scans(spectrum, RT_range)
 
 	if mass != 0
 		spectrum_XIC = filter_XIC(spectrum, mass)
@@ -73,11 +74,8 @@ end
 
 
 
-
+"""Print intensities of mz peaks of specific compound for each spectrum"""
 function mass_ratios(compound, spectra=spectra, compounds=compounds)
-    """Print intensities of mz peaks of specific compound for each spectrum"""
-    
-    
         compound_row = findfirst(comp -> comp == compound, compounds.compound)
     
         normalized_list = zeros(Int16, length(spectra))
@@ -183,17 +181,16 @@ function display_distribution(compound)
     CSV.write(csvout, distribution)
 end 
 
+"""Manually integrate spectrum between RT range at chosen mz values"""
 function manual_integration(spectrum, RT_range, mz_values)
-    """Manually integrate spectrum between RT range at chosen mz values"""
-    index_left, index_right = RT_indices(spectrum, RT_range)
+    index_left, index_right = RT_to_scans(spectrum, RT_range)
     spectrum_XIC = filter_XIC(spectrum, mz_values)
 
     return sum(spectrum_XIC[index_left : index_right])
 end
 
-
+"""Visualize determined peak range"""
 function visualize_peak_range(spectrum, compound_name, mz, secondary_ylims=0, predicted_RT=0)
-    """Visualize determined peak range"""
     PLOT_EXTRA_SCANS = 60
 
     # Read compounds.csv
@@ -201,44 +198,50 @@ function visualize_peak_range(spectrum, compound_name, mz, secondary_ylims=0, pr
 	filter!(row -> !(any(ismissing, (row.RT, row.mz)) || any((row.RT, row.mz) .== 0)), compounds)
 
     # Retrieve row of compound in compounds.csv
-    compound = filter(row -> row.compound == compound_name, compounds)
+    compound = filter(row -> row.compound == compound_name, compounds)[1, :]
 
-    RT_modifier = process_major(compounds, spectrum)[2]
+    RT_modifier = determine_RT_modifier(spectrum, compounds)
 
     # Determine predicted RT
     if predicted_RT == 0
-        predicted_RT = compound.RT[1] * RT_modifier
-    end
+        predicted_RT = compound.RT * RT_modifier
+    end    
 
-    # Read overlap_RT and determine RT (index) range
-    overlap_RT = ismissing(compound.overlap[1]) ? 0 : compound.overlap[1] * RT_modifier # TODO support 2 overlap RT's or return error
-    RT_range = (predicted_RT - MAX_RT_DEVIATION, predicted_RT + MAX_RT_DEVIATION)
-	RT_range_index = RT_indices(spectrum, RT_range)
-
-    # Determine peak range and baseline (noise median)
     spectrum_XIC = filter_XIC(spectrum, mz)
-    left_index, right_index, noise_median = determine_peak_range(spectrum_XIC, RT_range_index, compound.RT[1], overlap_RT)
+    peak_exists, max_scan = search_peak(spectrum_XIC, predicted_RT, spectrum)
 
-    if left_index == -1 || maximum(spectrum_XIC[left_index : right_index]) <= 0
-        return plot(spectrum_XIC, xlims=(RT_range_index[1], RT_range_index[2]), ylims=(0,
-                     maximum(spectrum_XIC[RT_range_index[1] : RT_range_index[2]]) * 1.1), 
-                          xlabel="scan number", ylabel="intensity", label=compound_name)
+    if peak_exists == false
+        _x_lims = RT_to_scans(spectrum, predicted_RT)
+        _x_lims[1] -= PLOT_EXTRA_SCANS; _x_lims[2] += PLOT_EXTRA_SCANS
+        return plot(spectrum_XIC, xlims=_x_lims, ylims=(0,
+                maximum(spectrum_XIC[_x_lims]) * 1.1), 
+                        xlabel="scan number", ylabel="intensity", label=compound_name)
     end
+    
+    # Determine baseline and bounds
+    pre_bounds = max_scan - MAX_SCANS_PEAK_LEFT : max_scan + MAX_SCANS_PEAK_RIGHT
+    overlap_RT_vals = parse_data(compound)[2] .* RT_modifier
+    overlap_max_left, overlap_max_right = determine_overlap(spectrum_XIC, max_scan, overlap_RT_vals, spectrum)
+    baseline = determine_baseline(spectrum_XIC, max_scan, pre_bounds)
+    bounds = determine_bounds(spectrum_XIC, max_scan, overlap_max_left, overlap_max_right, baseline, pre_bounds)
+    left_bound, right_bound = bounds[begin], bounds[end]
+
+    
     if secondary_ylims == 0
-        secondary_ylims = max(spectrum_XIC[left_index] * 5, spectrum_XIC[right_index] * 5, 4000)
+        secondary_ylims = max(spectrum_XIC[left_bound] * 5, spectrum_XIC[right_bound] * 5, 4000)
     end
-    _xlims = (left_index - PLOT_EXTRA_SCANS, right_index + PLOT_EXTRA_SCANS)
+    _xlims = (left_bound - PLOT_EXTRA_SCANS, right_bound + PLOT_EXTRA_SCANS)
 
-    plot(spectrum_XIC, xlims=_xlims, ylims=(0, maximum(spectrum_XIC[left_index : right_index]) * 1.1), 
+    plot(spectrum_XIC, xlims=_xlims, ylims=(0, maximum(spectrum_XIC[left_bound : right_bound]) * 1.1), 
                xlabel="scan number", ylabel="intensity", label=compound_name, left_margin = 5Plots.mm, 
                                                 legend=:topleft,right_margin = 18Plots.mm, grid=:off)
     plot!(title="Filename: $(spectrum["Filename"][1]) \nSample Name: $(spectrum["Sample Name"][1]) \nmz: $mz", titlefontsize=7)
-    vline!([left_index, right_index], linestyle=:dash, label="peak cutoffs")
-    hline!([noise_median], linestyle=:dash, label="baseline ($noise_median)", seriescolor=:green)
+    vline!([left_bound, right_bound], linestyle=:dash, label="peak cutoffs")
+    plot!(pre_bounds, baseline, linestyle=:dash, label="baseline ($(mean(baseline)))", seriescolor=:green)
 
-    if maximum(spectrum_XIC[left_index : right_index]) / secondary_ylims > 2.5
+    if maximum(spectrum_XIC[left_bound : right_bound]) / secondary_ylims > 2.5
 
-        hline!(twinx(), [noise_median], xlims=_xlims, linestyle=:dot, ylims=(0, secondary_ylims), label="", seriescolor=:green, xaxis=:false)
+        plot!(twinx(), pre_bounds, baseline, xlims=_xlims, linestyle=:dot, ylims=(0, secondary_ylims), label="", seriescolor=:green, xaxis=:false)
 
         plot!(twinx(), spectrum_XIC, xlims=_xlims,
         ylims=(0, secondary_ylims), linestyle=:dot, ylabel="intensity (zoomed)", label="", grid=:off)
