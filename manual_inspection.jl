@@ -72,114 +72,48 @@ function plt!(mass=0, RT=0, RT_range_size=0.5)
 	end
 end
 
+"""
+    mz_integrals_to_csv(spectra, compound_name, compounds)  
+Determine mz integrals for specific compound and output to csv
+"""
+function mz_integrals_to_csv(spectra, compound_name)
 
+    # Import RT and mz info of valid compounds into DataFrame
+	compounds_csv = CSV.read("compounds.csv", DataFrame)
+    compound = filter(row -> row.compound == compound_name, compounds_csv)
 
-"""Print intensities of mz peaks of specific compound for each spectrum"""
-function mass_ratios(compound, spectra=spectra, compounds=compounds)
-        compound_row = findfirst(comp -> comp == compound, compounds.compound)
-    
-        normalized_list = zeros(Int16, length(spectra))
-    
-        row = compounds[compound_row, :]
-        mass_vals = split(row[3], ";")
-        mass_vals = [parse(Float32, mass) for mass in mass_vals]
-        RT = row[2]
-    
-        for i=1:length(spectra)
-            spectrum = spectra[i]["MS1"]
-            RT_modifier = process_major(compounds, spectrum)[2]
-    
-            if RT_modifier == 0
-                continue
-            end
-            mass_intensity = integrate_mz_values(spectrum, RT * RT_modifier, mass_vals)
-            norm = mass_intensity[1, 2]
-    
-            if norm == 0
-                continue
-            end
-    
-            println("Spectrum $i: \t Mass \t   Intensity     Normalised Intensity")
-    
-            for (mass, intensity) in zip(mass_intensity[:, 1], mass_intensity[:, 2])
-                @printf("\t\t%3.2f\t| %10.3E  |  %4i\n", mass, intensity, intensity/norm * 1000)
-    
-                if mass == mass_vals[1]
-                    normalized_list[i] = round(Int16, intensity/norm * 1000)
-                end
-    
-            end
-    
-            println("----------------------------")
-        end
-    
-        # println("Normalized list second mass:")
-        # for i in normalized_list
-        # 	@printf("%4i\n", i)
-        # end
-    
-    end
+	# Create DataFrame for storing mz integrals
+	mz_values = parse_data(compound[1, :])[1]
+	mz_integrals_dataframe = DataFrame()
+	insertcols!(mz_integrals_dataframe, :item_number => String[])
+	insertcols!(mz_integrals_dataframe, :filename => String[])
+	insertcols!(mz_integrals_dataframe, :folder => String[])
+	for mz in mz_values
+		insertcols!(mz_integrals_dataframe, Symbol(mz) => Int[])
+	end
 
-
-	
-function display_distribution(compound)
-    data_folder = joinpath(@__DIR__, "data")
-    subfolder = "coca_caf_cal"
-    pathin = joinpath(data_folder, subfolder)
-    csvout = joinpath(pathin, "distribution.csv")
-
-    spectra = batch_import(pathin)
-
-    compounds = CSV.read("compounds.csv", DataFrame)
-    filter!(row -> !(any(ismissing, (row.RT, row.mz)) || any((row.RT, row.mz) .== 0)), compounds)
-
-    compound_row = compounds[findfirst(comp -> comp == compound, compounds.compound), :]
-    
-
-    # Read mz values
-    mass_str = split(compound_row.mz, ";")
-    mass_values = Array{Any,1}(undef, length(mass_str))
-    for (i, mass) in enumerate(mass_str)
-        if startswith(mass, "(")
-            mass = split(mass[2:end - 1], ",")
-            mass_values[i] = Tuple(([parse(Float32, sub_mass) for sub_mass in mass]))
-        else
-            mass_values[i] = parse(Float32, mass)
-        end	
-    end
-
-    distribution = DataFrame()
-    insertcols!(distribution, :item_number => String[])
-    insertcols!(distribution, :filename => String[])
-    insertcols!(distribution, :folder => String[])
-    for mz in mass_values
-        insertcols!(distribution, Symbol(mz) => Int32[])
-    end
-
-    for i=1:length(spectra)
-        println("Analysing spectrum $i...")
+    # Analyse all spectra
+	for i=1:length(spectra)
+		println("Analysing spectrum $i...")
         spectrum = spectra[i]["MS1"]
 
-        RT_modifier = process_major(compounds, spectrum)[2]
-        RT = compound_row.RT * RT_modifier
-
-        # Save metadata
-        sample_metadata = Array{Any,1}(undef, 3)
-        sample_metadata[1] = spectrum["Sample Name"][1]
-        sample_metadata[2] = spectrum["Filename"][1]
-        sample_metadata[3] = subfolder
-
-        # Integrate peaks
-        mass_integral = integrate_mz_values(spectrum, RT, mass_values)
-        push!(distribution, append!(sample_metadata, zeros(length(mass_values))))
-        for j=1:length(mass_values)
-            distribution[i, Symbol(string(mass_integral[j, 1]))] = mass_integral[j, 2]
+        # Determine mz integrals, retrieve metadata, and store in DataFrame
+        mz_integrals = analyse_spectrum(spectrum, compounds_csv, compound)
+        sample_metadata = create_impurity_profile(spectrum, 0, 0, 0)[1]
+        if mz_integrals == 0
+            push!(mz_integrals_dataframe, append!(sample_metadata, zeros(length(mz_values))))
+        else
+            mz_integrals = mz_integrals[Symbol(compound_name)]
+            push!(mz_integrals_dataframe, append!(sample_metadata, [mz_integrals[Symbol(mz)] for mz in mz_values]))
         end
-
+        
+        
     end
 
-    CSV.write(csvout, distribution)
-end 
+    CSV.write(joinpath(@__DIR__, "$(compound_name)_mz integrals.csv"), mz_integrals_dataframe)
+end
+
+
 
 """Manually integrate spectrum between RT range at chosen mz values"""
 function manual_integration(spectrum, RT_range, mz_values)
@@ -211,10 +145,10 @@ function visualize_peak_range(spectrum, compound_name, mz, secondary_ylims=0, pr
     peak_exists, max_scan = search_peak(spectrum_XIC, predicted_RT, spectrum)
 
     if peak_exists == false
-        _x_lims = RT_to_scans(spectrum, predicted_RT)
+        _x_lims = [i for i in RT_to_scans(spectrum, predicted_RT)]
         _x_lims[1] -= PLOT_EXTRA_SCANS; _x_lims[2] += PLOT_EXTRA_SCANS
         return plot(spectrum_XIC, xlims=_x_lims, ylims=(0,
-                maximum(spectrum_XIC[_x_lims]) * 1.1), 
+                maximum(spectrum_XIC[_x_lims[1]:_x_lims[2]]) * 1.1), 
                         xlabel="scan number", ylabel="intensity", label=compound_name)
     end
     
