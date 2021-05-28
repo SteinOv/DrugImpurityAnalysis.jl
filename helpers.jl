@@ -17,7 +17,7 @@ function RT_to_scans(spectrum, RT_range)
 	end
 
 	# Convert Integer to tuple
-	if typeof(RT_range) == Int
+	if RT_range isa(Number)
 		RT_range = (RT_range, RT_range)
 	end
 
@@ -55,34 +55,38 @@ function filter_XIC(spectrum, mass_values)
 	return spectrum_XIC
 end
 
-"""Parses mz values and RT overlap values from string to array"""
+"""
+	parse_data(row)
+Parses mz values and RT overlap values from string to array
+return mz_values, RT_overlap_values
+"""
 function parse_data(row)
 	# Parse mz values
-	mz_vals_string = split(string(row.mz), ";")
-	mz_vals = Array{Any,1}(undef, length(mz_vals_string))
-	for (i, mz) in enumerate(mz_vals_string)
+	mz_values_string = split(string(row.mz), ";")
+	mz_values = Array{Any,1}(undef, length(mz_values_string))
+	for (i, mz) in enumerate(mz_values_string)
 
 		# Tuple of mz values
 		if startswith(mz, "(")
 			mz_tuple_string = split(mz[2:end - 1], ",")
-			mz_vals[i] = Tuple(([parse(Float32, sub_mass) for sub_mass in mz_tuple_string]))
+			mz_values[i] = Tuple(([parse(Float32, sub_mass) for sub_mass in mz_tuple_string]))
 
 		# Separate mz value
 		else
-			mz_vals[i] = parse(Float32, mz)
+			mz_values[i] = parse(Float32, mz)
 		end
 	end
 
 	# Parse overlap values
-	RT_overlap_vals_string = split(string(row.overlap), ",")
-	RT_overlap_vals = zeros(Float16, 2)
-	for RT_overlap in RT_overlap_vals_string
+	RT_overlap_values_string = split(string(row.overlap), ",")
+	RT_overlap_values = zeros(Float16, 2)
+	for RT_overlap in RT_overlap_values_string
 		RT_overlap = RT_overlap == "missing" ? 0 : parse(Float16, RT_overlap)
 		index = RT_overlap < row.RT ? 1 : 2
-		RT_overlap_vals[index] = RT_overlap
+		RT_overlap_values[index] = RT_overlap
 	end
 
-	return mz_vals, RT_overlap_vals
+	return mz_values, RT_overlap_values
 
 end
 
