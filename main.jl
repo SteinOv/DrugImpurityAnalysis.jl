@@ -120,7 +120,11 @@ function analyse_spectrum(spectrum, compounds_csv, compounds_to_analyse=compound
 end #FUNCTION
 
 
-"""Determines retention time shift of cocaine and returns {RT_actual / RT_predicted}"""
+"""
+	determine_RT_modifier(spectrum, compounds)
+Determines retention time shift of cocaine and returns {RT_actual / RT_predicted}
+
+	return RT_modifier"""
 function determine_RT_modifier(spectrum, compounds)
 
 	# Read predicted RT and highest mz value
@@ -144,11 +148,21 @@ function determine_RT_modifier(spectrum, compounds)
 	return round(RT_actual / RT_predicted, digits=3)
 end
 
-"""Searches for peak in ion-extracted chromatogram"""
-function search_peak(spectrum_XIC, RT, spectrum)
+"""
+	search_peak(spectrum_XIC, RT, spectrum)
+Searches for peak in ion-extracted chromatogram
+	
+	return peak_exists, max_scan_number"""
+function search_peak(spectrum_XIC, RT, spectrum, left_scan=0, right_scan=0)
 	# Range to search peak in
+
 	RT_range = (RT - MAX_RT_SHIFT, RT + MAX_RT_SHIFT)
-	scan_range = RT_to_scans(spectrum, RT_range)
+	scan_range = collect(RT_to_scans(spectrum, RT_range))
+
+	# If scans pre-defined
+	scan_range[1] = left_scan == 0 ? scan_range[1] : left_scan
+	scan_range[2] = right_scan == 0 ? scan_range[2] : right_scan
+
 	max_intensity, max_scan_number = findmax(spectrum_XIC[scan_range[1] : scan_range[2]])
 	max_scan_number += scan_range[1] - 1
 
@@ -158,8 +172,8 @@ function search_peak(spectrum_XIC, RT, spectrum)
 	end
 
 	# Bounds used for determining whether peak is noise or not
-	left_scan = max_scan_number - round(Int, MAX_SCANS_PEAK_SEARCH / 2)
-	right_scan = max_scan_number + round(Int, MAX_SCANS_PEAK_SEARCH / 2)
+	left_scan = left_scan == 0 ? max_scan_number - round(Int, MAX_SCANS_PEAK_SEARCH / 2) : left_scan
+	right_scan = right_scan == 0 ? max_scan_number + round(Int, MAX_SCANS_PEAK_SEARCH / 2) : right_scan
 
 	# Count number of median crosses
 	spectrum_part_median = median(spectrum_XIC[left_scan:right_scan])
@@ -194,21 +208,16 @@ function determine_overlap(spectrum_XIC, max_scan, RT_overlap_vals, spectrum)
 			scan_upper_bound = i == 1 ? -MAX_SCANS_PEAK_LEFT : MAX_SCANS_PEAK_RIGHT
 			spectrum_scan_range = max_scan:direction:(scan_upper_bound + max_scan)
 
-			# Determine median of range and initialize variables
-			range_median = median(spectrum_XIC[spectrum_scan_range])
+			# Determine mean of range and initialize variables
+			range_mean = mean(spectrum_XIC[spectrum_scan_range])
 			below_consecutive, above_consecutive = 0, 0
-			reached_below, reached_above = false, false
+			reached_below = false
 			overlap_max_scan = 0
+			left_scan, right_scan = 0, 0
 
 			# Iterate through sequence and search for peak separate from main peak
 			for scan=spectrum_scan_range
-				# Found overlap
-				if reached_below && reached_above
-					overlap_range = (scan - OVERLAP_CONSECUTIVE_ABOVE_MEDIAN * direction):direction:spectrum_scan_range[end]
-					overlap_max_scan = overlap_range[begin] + direction * (findmax(spectrum_XIC[overlap_range])[2] - 1)
-					break
-
-				elseif spectrum_XIC[scan] < range_median
+				if spectrum_XIC[scan] < range_mean
 					below_consecutive += 1
 					above_consecutive = 0
 				else
@@ -221,18 +230,23 @@ function determine_overlap(spectrum_XIC, max_scan, RT_overlap_vals, spectrum)
 					reached_below = true
 				# Previously consecutively below median and now consecutively above median
 				elseif reached_below && above_consecutive >= OVERLAP_CONSECUTIVE_ABOVE_MEDIAN
-					reached_above = true
+					overlap_range = (scan - OVERLAP_CONSECUTIVE_ABOVE_MEDIAN * direction):direction:spectrum_scan_range[end]
+					# overlap_max_scan = overlap_range[begin] + direction * (findmax(spectrum_XIC[overlap_range])[2] - 1)
+					# Bounds for search_peak
+					left_scan = direction == -1 ? overlap_range[end] : overlap_range[begin]
+					right_scan = direction == -1 ? overlap_range[begin] : overlap_range[end]
+					break
 				end
 			end
 
 			# Set RT_overlap to 0 if not found, else to RT of maximum
 			RT_overlap = overlap_max_scan == 0 ? 0 : spectrum["Rt"][overlap_max_scan]
 
-		end
 
-		if RT_overlap > 0
-			# Final check whether peak exists
-			overlap_max_scans[i] = search_peak(spectrum_XIC, RT_overlap, spectrum)[2]
+			if RT_overlap > 0
+				# Final check whether peak exists
+				overlap_max_scans[i] = search_peak(spectrum_XIC, RT_overlap, spectrum, left_scan, right_scan)[2]
+			end
 		end
 
 	end
