@@ -136,6 +136,10 @@ function visualize_peak_range(spectrum, compound_name, mz, secondary_ylims=0, pr
 
     RT_modifier = determine_RT_modifier(spectrum, compounds)
 
+    # Cocaine not found
+    if RT_modifier == -1
+        return @error "Cocaine peak not found"
+    end
     # Determine predicted RT
     if predicted_RT == 0
         predicted_RT = compound.RT * RT_modifier
@@ -143,6 +147,7 @@ function visualize_peak_range(spectrum, compound_name, mz, secondary_ylims=0, pr
 
     spectrum_XIC = filter_XIC(spectrum, mz)
     peak_exists, max_scan = search_peak(spectrum_XIC, predicted_RT, spectrum)
+
 
     if peak_exists == false
         _x_lims = [i for i in RT_to_scans(spectrum, predicted_RT)]
