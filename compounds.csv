@@ -1,6 +1,6 @@
 ﻿compound,RT,mz,type,type_int,ratio,overlap
-cocaine,6.63,182.12;82.07;83.07;94.07;77.04;105.03;96.08;42.03;303.15,major,-1,0.72;1;0.37;0.37;0.36;0.3;0.25;0.17;0.14,6.51
-C28,8.15,57;43;71;85,internal_standard,-10,0.1,
+cocaine,6.63,303,major,-1,0.14,6.51
+C28,8.15,57,internal_standard,-10,0.1,
 tropacocaine,5.83,"(124,82,94,83,77,105,245)",impurity,0,,
 norcocaine,6.51,168;68;136,impurity,0,1;0.41;0.38,6.63
 N-benzoylnormethylecgonine,6.87,184;136;168,impurity,0,,6.63
