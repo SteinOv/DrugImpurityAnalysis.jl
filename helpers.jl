@@ -21,7 +21,7 @@ function RT_to_scans(spectrum, RT_range)
 		RT_range = (RT_range, RT_range)
 	end
 
-	return (findfirst(i -> i >= RT_range[1], spectrum["Rt"]), findlast(i -> i <= RT_range[2], spectrum["Rt"]))
+	return searchsortedfirst(spectrum["Rt"], RT_range[1]), searchsortedlast(spectrum["Rt"], RT_range[2])
 end
 
 """Returns filtered spectrum based on given mass (mz) values"""

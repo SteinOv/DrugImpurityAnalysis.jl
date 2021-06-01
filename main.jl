@@ -260,6 +260,30 @@ Determines baseline within bounds
 First sets all values above half of maximum to zero,
 then sets baseline to median of remaining spectrum part
 """
+function determine_baseline(spectrum_XIC, max_scan, overlap_max_left, overlap_max_right, bounds)
+	#TODO take section on right side if overlap on left
+	if overlap_max_left > 0
+		@warn "Overlap on left side" overlap_max_left, overlap_max_right
+	end
+	# Noise end as minimum closest to peak
+	noise_end = max_scan - findmin(spectrum_XIC[max_scan:-1:max_scan - 30])[2] + 1
+	spectrum_part = spectrum_XIC[noise_end - BASELINE_SCANS:noise_end]
+
+	# Calculate median and set median as baseline
+	spectrum_part_median = round(Int, median(spectrum_part))
+	baseline = fill(spectrum_part_median, length(bounds))
+
+	return baseline
+end
+
+
+#=
+
+"""
+Determines baseline within bounds
+First sets all values above half of maximum to zero,
+then sets baseline to median of remaining spectrum part
+"""
 function determine_baseline(spectrum_XIC, max_scan, bounds)
 	# Set all values above half of the maximum to zero
 	spectrum_part = spectrum_XIC[round(Int, max_scan - BASELINE_SCANS / 2) : round( Int, max_scan + BASELINE_SCANS / 2)]
