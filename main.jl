@@ -20,11 +20,12 @@ const MAX_SCANS_PEAK_SEARCH = 20 # Used for differentiating peak from noise
 const MAX_SCANS_PEAK_LEFT = 40 # Bounds for peak integration (left)
 const MAX_SCANS_PEAK_RIGHT = 80 # Bounds for peak integration (right)
 
-# If fraction of median crossings is above this value, noise instead of peak
-const NOISE_CROSSINGS_FRACTION = 0.33
+# If fraction of median/mean crossings is above either value, noise instead of peak
+const NOISE_MEDIAN_CROSSINGS_FRACTION = 0.40
+const NOISE_MEAN_CROSSINGS_FRACTION = 0.25
 
 # Amount of scans for determining baseline
-const BASELINE_SCANS = 100
+const BASELINE_SCANS = 20
 
 # Used for determining overlap
 const OVERLAP_CONSECUTIVE_BELOW_MEDIAN = 2
@@ -36,7 +37,7 @@ function main()
 
 	# Specify path
 	data_folder = joinpath(@__DIR__, "data")
-	subfolder = "coca_caf_cal"
+	subfolder = "cocabricks"
 	pathin = joinpath(data_folder, subfolder)
 	csvout = joinpath(pathin, "impurity_profile.csv")
 
@@ -64,7 +65,6 @@ function main()
 		spectrum = spectra[i]["MS1"]
 
 		compound_mz_integrals = analyse_spectrum(spectrum, compounds_csv)
-
 		# Create impurity profile and add to DataFrame
 		sample_metadata, sample_profile = create_impurity_profile(spectrum, compound_mz_integrals, compounds_csv, compounds_in_profile)
 		push!(impurity_profiles, append!(sample_metadata, sample_profile))
@@ -107,7 +107,7 @@ function analyse_spectrum(spectrum, compounds_csv, compounds_to_analyse=compound
 			# Determine baseline and bounds
 			pre_bounds = max_scan - MAX_SCANS_PEAK_LEFT : max_scan + MAX_SCANS_PEAK_RIGHT
 			overlap_max_left, overlap_max_right = determine_overlap(spectrum_XIC, max_scan, overlap_RT_vals, spectrum)
-			baseline = determine_baseline(spectrum_XIC, max_scan, pre_bounds)
+			baseline = determine_baseline(spectrum_XIC, max_scan, overlap_max_left, overlap_max_right, pre_bounds)
 			peak_bounds = determine_bounds(spectrum_XIC, max_scan, overlap_max_left, overlap_max_right, baseline, pre_bounds)
 
 			# Calculate and store integral
@@ -177,15 +177,25 @@ function search_peak(spectrum_XIC, RT, spectrum, left_scan=0, right_scan=0)
 
 	# Count number of median crosses
 	spectrum_part_median = median(spectrum_XIC[left_scan:right_scan])
-	crossings_count = 0
+	median_crossings_count = 0
 	for i in (left_scan + 1):right_scan
 		if (spectrum_XIC[i] - spectrum_part_median) * (spectrum_XIC[i - 1] - spectrum_part_median) <= 0
-			crossings_count += 1
+			median_crossings_count += 1
+		end
+	end
+
+	# Count number of mean crosses
+	spectrum_part_mean = mean(spectrum_XIC[left_scan:right_scan])
+	mean_crossings_count = 0
+	for i in (left_scan + 1):right_scan
+		if (spectrum_XIC[i] - spectrum_part_mean) * (spectrum_XIC[i - 1] - spectrum_part_mean) <= 0
+			mean_crossings_count += 1
 		end
 	end
 
 	# More crossings than allowed, noise instead of peak
-	if crossings_count / length(spectrum_XIC[left_scan:right_scan]) > NOISE_CROSSINGS_FRACTION
+	if median_crossings_count / length(spectrum_XIC[left_scan:right_scan]) > NOISE_MEDIAN_CROSSINGS_FRACTION ||
+	   		mean_crossings_count / length(spectrum_XIC[left_scan:right_scan]) > NOISE_MEAN_CROSSINGS_FRACTION
 		return false, -1
 	else
 		return true, max_scan_number
@@ -201,6 +211,8 @@ non-thorough approach for determining whether overlap is present
 function determine_overlap(spectrum_XIC, max_scan, RT_overlap_vals, spectrum)
 	overlap_max_scans = zeros(Int, 2)
 	for (i, RT_overlap) in enumerate(RT_overlap_vals)
+
+		left_scan, right_scan = 0, 0
 		# Overlap not defined
 		if RT_overlap == 0
 			# Determine iteration sequence
@@ -213,7 +225,6 @@ function determine_overlap(spectrum_XIC, max_scan, RT_overlap_vals, spectrum)
 			below_consecutive, above_consecutive = 0, 0
 			reached_below = false
 			overlap_max_scan = 0
-			left_scan, right_scan = 0, 0
 
 			# Iterate through sequence and search for peak separate from main peak
 			for scan=spectrum_scan_range
@@ -231,7 +242,7 @@ function determine_overlap(spectrum_XIC, max_scan, RT_overlap_vals, spectrum)
 				# Previously consecutively below median and now consecutively above median
 				elseif reached_below && above_consecutive >= OVERLAP_CONSECUTIVE_ABOVE_MEDIAN
 					overlap_range = (scan - OVERLAP_CONSECUTIVE_ABOVE_MEDIAN * direction):direction:spectrum_scan_range[end]
-					# overlap_max_scan = overlap_range[begin] + direction * (findmax(spectrum_XIC[overlap_range])[2] - 1)
+					# overlap_max_scan = overlap_range[begin] + direction * (findmax(spectrum_XIC[overlap_range])[2] - 1)#TEMP
 					# Bounds for search_peak
 					left_scan = direction == -1 ? overlap_range[end] : overlap_range[begin]
 					right_scan = direction == -1 ? overlap_range[begin] : overlap_range[end]
@@ -241,14 +252,17 @@ function determine_overlap(spectrum_XIC, max_scan, RT_overlap_vals, spectrum)
 
 			# Set RT_overlap to 0 if not found, else to RT of maximum
 			RT_overlap = overlap_max_scan == 0 ? 0 : spectrum["Rt"][overlap_max_scan]
-
-
-			if RT_overlap > 0
-				# Final check whether peak exists
-				overlap_max_scans[i] = search_peak(spectrum_XIC, RT_overlap, spectrum, left_scan, right_scan)[2]
-			end
+		else
+			overlap_scan = RT_to_scans(spectrum, RT_overlap)[1]
+			scan_between = round(Int, (overlap_scan + max_scan) / 2)
+			left_scan = i == 1 ? 0 : scan_between
+			right_scan = i == 1 ? scan_between : 0
 		end
 
+		if RT_overlap > 0
+			# Final check whether peak exists
+			overlap_max_scans[i] = search_peak(spectrum_XIC, RT_overlap, spectrum, left_scan, right_scan)[2]
+		end
 	end
 
 	return overlap_max_scans
@@ -256,9 +270,7 @@ end
 
 
 """
-Determines baseline within bounds
-First sets all values above half of maximum to zero,
-then sets baseline to median of remaining spectrum part
+Determines baseline based on range left of peak
 """
 function determine_baseline(spectrum_XIC, max_scan, overlap_max_left, overlap_max_right, bounds)
 	#TODO take section on right side if overlap on left
@@ -277,8 +289,8 @@ function determine_baseline(spectrum_XIC, max_scan, overlap_max_left, overlap_ma
 end
 
 
-#=
 
+#=
 """
 Determines baseline within bounds
 First sets all values above half of maximum to zero,
@@ -296,7 +308,7 @@ function determine_baseline(spectrum_XIC, max_scan, bounds)
 
 	return baseline
 end
-
+=#
 
 """
 Determine bounds of peak
@@ -323,7 +335,7 @@ end
 """Integrates peak within bounds with baseline subtracted"""
 function integrate_peak(spectrum_XIC, bounds, baseline, pre_bounds)
 	spectrum_part = spectrum_XIC[pre_bounds]
-	spectrum_part .-= baseline
+	# spectrum_part .-= baseline
 	bounds = bounds .- (pre_bounds[begin] - 1)
 
 	# Subtract baseline from spectrum, negative values set to zero
@@ -375,11 +387,24 @@ function create_impurity_profile(spectrum, compound_mz_integrals, compounds_csv,
 		return metadata, zeros(length(compounds_in_profile))
 	end
 
+	# Sum all integrals of cocaine
 	major_integral_sum = sum(values(compound_mz_integrals[Symbol(major_compound.compound)]))
 	
-	for (i, compound) in enumerate(compounds_in_profile)
-		integral_sum = sum(values(compound_mz_integrals[Symbol(compound)]))
+	# Calculate percent ratio for all compounds
+	for (i, compound_name) in enumerate(compounds_in_profile)
+		mz_dict = compound_mz_integrals[Symbol(compound_name)]
+
+		# Check if first mass has no intensity
+		first_mz = parse_data(filter(row -> row.compound == compound_name, compounds_csv)[1, :])[1][1]
+		if mz_dict[Symbol(first_mz)] <= 0
+			impurity_profile_values[i] = 0
+			continue
+		end
+
+		# Calculate percent ratio, set to zero if < 0.05
+		integral_sum = sum(values(mz_dict))
 		percent_ratio = round(integral_sum / major_integral_sum * 100, digits=2)
+		# percent_ratio = percent_ratio > 0.05 ? percent_ratio : 0 #TEMP
 		impurity_profile_values[i] = percent_ratio
 	end
 

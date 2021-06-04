@@ -161,7 +161,7 @@ function visualize_peak_range(spectrum, compound_name, mz, secondary_ylims=0, pr
     pre_bounds = max_scan - MAX_SCANS_PEAK_LEFT : max_scan + MAX_SCANS_PEAK_RIGHT
     overlap_RT_vals = parse_data(compound)[2] .* RT_modifier
     overlap_max_left, overlap_max_right = determine_overlap(spectrum_XIC, max_scan, overlap_RT_vals, spectrum)
-    baseline = determine_baseline(spectrum_XIC, max_scan, pre_bounds)
+    baseline = determine_baseline(spectrum_XIC, max_scan, overlap_max_left, overlap_max_right, pre_bounds)
     bounds = determine_bounds(spectrum_XIC, max_scan, overlap_max_left, overlap_max_right, baseline, pre_bounds)
     left_bound, right_bound = bounds[begin], bounds[end]
 

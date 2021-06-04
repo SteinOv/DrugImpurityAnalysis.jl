@@ -114,8 +114,10 @@ function batch_import(pathin)
 
 	# Load files into spectra array
 	for (i, file_index) in enumerate(supported_indices)
+		
 		filename = files[file_index]
-		spectra[i] = import_files(pathin,[filename],mz_thresh,Int_thresh)
+		spectra[i] = import_files_light(pathin,[filename],mz_thresh,Int_thresh)
+
 		spectra[i]["MS1"]["Filename"] = [filename]
 		spectra[i]["MS1"]["Sample Name"] = [retrieve_sample_name(pathin, filename)]
 		spectra[i]["MS1"]["Folder Name"] = [split(pathin, "\\")[end]]

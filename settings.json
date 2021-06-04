@@ -1,0 +1,46 @@
+{
+    "main_settings" : {
+        "main_compound": "cocaine",
+        "internal_standard": "C28",
+        "main/IS min ratio": 0.1
+    },
+    "output_metadata":[
+        {
+            "type": "sample_info_xml",
+            "header": "item_number",
+            "element_name": "Sample Name"
+        }
+    ],
+    "filters" : [ 
+        {
+        "type": "sample_info_xml",
+        "element_name": "Comment",
+        "filter": "must_contain",
+        "value": "cocaine"
+        } 
+    ],
+
+    "compound_groups": {
+        "impurities": [
+            "tropacocaine",
+            "norcocaine",
+            "N-benzoylcocaine",
+            "cis-cinnamoylcocaine",
+            "trans-cinnamoylcocaine"
+        ],
+        "adulterants" : [
+            "lidocaine",
+            "procaine",
+            "tetracaine",
+            "benzocaine",
+            "caffeine",
+            "acetylsalicylic acid",
+            "phenacetin",
+            "ibuprofen",
+            "levamisole",
+            "hydroxyzine",
+            "ketamine"
+        ]
+    }
+    
+}

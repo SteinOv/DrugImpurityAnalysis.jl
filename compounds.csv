@@ -1,7 +1,7 @@
 ﻿compound,RT,mz,type,type_int,ratio,overlap
 cocaine,6.63,303,major,-1,0.14,6.51
 C28,8.15,57,internal_standard,-10,0.1,
-tropacocaine,5.83,"(124,82,94,83,77,105,245)",impurity,0,,
+tropacocaine,5.83,124,impurity,0,,
 norcocaine,6.51,168;68;136,impurity,0,1;0.41;0.38,6.63
 N-benzoylnormethylecgonine,6.87,184;136;168,impurity,0,,6.63
 cis-cinnamoylcocaine,7.17,"(82, 182, 83, 96, 94)",impurity,0,"(1, 0.6, 0.56, 0.55, 0.26)",
