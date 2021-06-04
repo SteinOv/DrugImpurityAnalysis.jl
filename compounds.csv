@@ -1,20 +1,20 @@
-﻿compound,RT,mz,type,type_int,ratio,overlap
-cocaine,6.63,303,major,-1,0.14,6.51
-C28,8.15,57,internal_standard,-10,0.1,
-tropacocaine,5.83,124,impurity,0,,
-norcocaine,6.51,168;68;136,impurity,0,1;0.41;0.38,6.63
-N-benzoylnormethylecgonine,6.87,184;136;168,impurity,0,,6.63
-cis-cinnamoylcocaine,7.17,"(82, 182, 83, 96, 94)",impurity,0,"(1, 0.6, 0.56, 0.55, 0.26)",
-trans-cinnamoylcocaine,7.54,"(82, 182, 83, 96, 94)",impurity,0,"(1, 0.52, 0.47, 0.55, 0.40)",7.72
-lidocaine,5.56,86;58;87;30;72;120;56,adulterant,1,1;0.07;0.06;0.03;0.03;0.03;0.03,
-procaine,6.06,86;99;120;164;92;87;58,adulterant,1,1;0.37;0.31;0.09;0.07;0.06;0.05,
-tetracaine,6.67,176,adulterant,1,0.14,
-benzocaine,4.33,120;165;92;65;137;121;93,adulterant,1,1;0.3;0.22;0.18;0.15;0.1;0.04,
-caffeine,5.39,194;109;55;67;82;42;193,adulterant,1,1;0.72;0.44;0.44;0.33;0.14;0.14,
-acetylsalicylic acid,0,120;138;43;92;121;63;65,adulterant,1,1;0.59;0.37;0.36;0.23;0.09;0.08,
-phenacetin,4.86,108;109;179;137;43;81;80,adulterant,1,1;0.86;0.65;0.42;0.34;0.11;0.11,
-ibuprofen,4.48,161;163;91;119;117;107;206,adulterant,1,1;0.88;0.7;0.55;0.48;0.47;0.38,
-levamisole,5.94,148;204;73;101;203;121;77,adulterant,1,1;0.92;0.59;0.52;0.44;0.28;0.24,
-hydroxyzine,0,201;165;203;166;299;202;45,adulterant,1,1;0.46;0.33;0.33;0.17;0.15;0.13,
-diltiazem,0,58;71;72;121;150;136;43,adulterant,1,1;0.45;0.17;0.11;0.10;0.06;0.04,
-Ketamine,5.52,,adulterant,1,,
+﻿compound,RT,mz,overlap
+cocaine,6.63,303,6.51
+C28,8.15,57,
+tropacocaine,5.83,124,
+norcocaine,6.51,168;68;136,6.63
+N-benzoylnormethylecgonine,6.87,184;136;168,6.63
+cis-cinnamoylcocaine,7.17,"(82, 182, 83, 96, 94)",
+trans-cinnamoylcocaine,7.54,"(82, 182, 83, 96, 94)",7.72
+lidocaine,5.56,86;58;87;30;72;120;56,
+procaine,6.06,86;99;120;164;92;87;58,
+tetracaine,6.67,176,
+benzocaine,4.33,120;165;92;65;137;121;93,
+caffeine,5.39,194;109;55;67;82;42;193,
+acetylsalicylic acid,0,120;138;43;92;121;63;65,
+phenacetin,4.86,108;109;179;137;43;81;80,
+ibuprofen,4.48,161;163;91;119;117;107;206,
+levamisole,5.94,148;204;73;101;203;121;77,
+hydroxyzine,0,201;165;203;166;299;202;45,
+diltiazem,0,58;71;72;121;150;136;43,
+ketamine,5.52,,

@@ -19,7 +19,9 @@
         "value": "cocaine"
         } 
     ],
-
+    "exclude_from_impurity_profile": [
+        "C28"
+    ],
     "compound_groups": {
         "impurities": [
             "tropacocaine",

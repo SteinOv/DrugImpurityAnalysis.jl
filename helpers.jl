@@ -90,11 +90,12 @@ function parse_data(row)
 
 end
 
-"""Returns list containing all imported spectra from folder"""
-function batch_import(pathin)
+"""
+	batch_import(pathin)
+Returns list containing all imported spectra from folder and metadata headers
+"""
+function batch_import(pathin, settings_json)
 	
-	mz_thresh = [0, 0]
-	Int_thresh = 0
 	files = readdir(pathin, sort=false)
 	files_supported = zeros(Bool, length(files),1)
 
@@ -109,27 +110,54 @@ function batch_import(pathin)
 	supported_indices=findall(x -> x == true, files_supported)
 	num_of_spectra = length(supported_indices)
 
-	# Create array for storing spectra
-	spectra = Array{Any}(undef,size(supported_indices,1))
+	# Retrieve which metadata to save
+	info_containing = settings_json[Symbol("output_metadata")]
+	sample_info_metadata = Dict(i["element_name"] => i["header"] for i in info_containing if i["type"] == "sample_info_xml")
+	metadata_headers = append!([], values(sample_info_metadata), ["Filename", "Folder Name"])
+	# Retrieve filters
+	filters = settings_json[Symbol("filters")]
+	filters_must_contain = Dict(i["element_name"] => i["value"] for i in filters if i["filter"] == "must_contain")
 
+
+
+	spectra = []
 	# Load files into spectra array
 	for (i, file_index) in enumerate(supported_indices)
-		
 		filename = files[file_index]
-		spectra[i] = import_files_light(pathin,[filename],mz_thresh,Int_thresh)
 
-		spectra[i]["MS1"]["Filename"] = [filename]
-		spectra[i]["MS1"]["Sample Name"] = [retrieve_sample_name(pathin, filename)]
-		spectra[i]["MS1"]["Folder Name"] = [split(pathin, "\\")[end]]
+		# Retrieve sample info and check filter requirements
+		element_names = append!([], keys(sample_info_metadata), keys(filters_must_contain))
+		sample_info = retrieve_sample_info(pathin, filename, element_names)
+		filters_accepted = true
+		for (element_name, value) in filters_must_contain
+			if !contains(sample_info[element_name], value)
+				filters_accepted = false
+				break
+			end
+		end
+
+		if filters_accepted == false
+			println("Spectrum $(i[1]) of $num_of_spectra did not meet filter requirements")
+			continue
+		end
+
+		# Read spectrum
+		spectrum = import_files_light(pathin,[filename])
+		push!(spectra, spectrum)
+
+		# Add metadata
+		spectrum["MS1"]["Filename"] = filename
+		merge!(spectrum["MS1"], Dict(header => sample_info[element_name] for (element_name, header) in sample_info_metadata))
+		spectrum["MS1"]["Folder Name"] = split(pathin, "\\")[end]
 		
 
 		println("Read spectra $(i[1]) of $num_of_spectra")
 	end
 
-	return spectra
+	return spectra, metadata_headers
 end
 
-function retrieve_sample_name(pathin, filename)
+function retrieve_sample_info(pathin, filename, element_names)
 	# Path to xml file which contains Sample Name
 	folder_name = filename[begin:end-5] * "D"
 	folder_loc = joinpath(pathin, folder_name)
@@ -137,6 +165,7 @@ function retrieve_sample_name(pathin, filename)
 
 	# File does not exist
 	if !isfile(sample_info_file)
+		@warn "$(sample_info_file) does not exist, metadata will not be saved"
 		return ""
 	end
 
@@ -145,12 +174,17 @@ function retrieve_sample_name(pathin, filename)
 	xroot = root(xdoc)
 	xarray = xroot["Field"]
 
-	# Find index where Sample Name is stored and retrieve its value
-	element_index = findfirst(i -> content(find_element(i, "Name")) == "Sample Name", xarray)
-	sample_name = content(find_element(xarray[element_index], "Value"))
+	
+	# Find index where element is stored and retrieve its value
+	elements = Dict{String, String}()
+	for element_name in element_names
+		element_index = findfirst(i -> content(find_element(i, "Name")) == element_name, xarray)
+		element_value = content(find_element(xarray[element_index], "Value"))
+		elements[element_name] = element_value
+	end
 
 	# Free memory
 	free(xdoc)
 
-	return sample_name
+	return elements
 end

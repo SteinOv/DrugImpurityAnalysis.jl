@@ -4,13 +4,14 @@ using Printf
 using CSV
 using DataFrames
 using LightXML
+using JSON3
 
 using BenchmarkTools
 
 include("helpers.jl")
 include("manual_inspection.jl")
 
-const MAJOR_RT_DEVIATION = 1 # Absolute maximum shift of cocaine peak
+const MAIN_RT_DEVIATION = 1 # Absolute maximum shift of cocaine peak
 
 const MAX_MZ_DEVIATION = 0.5 # Maximum deviation from given mz value in XIC spectrum
 const MAX_RT_SHIFT = 0.05 # Maximum amount that RT can shift from determined RT
@@ -39,22 +40,57 @@ function main()
 	data_folder = joinpath(@__DIR__, "data")
 	subfolder = "cocabricks"
 	pathin = joinpath(data_folder, subfolder)
+	impurity_profiles = create_impurity_profile(pathin)
 	csvout = joinpath(pathin, "impurity_profile.csv")
+	CSV.write(csvout, impurity_profiles)
+
+	pathin = "D:\\data Stein gcms\\2019"
+	csvout = joinpath(pathin, "impurity_profile.csv")
+end
+
+function create_impurity_profiles_batch(pathin, pathout=pathin)
+	csvout = joinpath(pathout, "impurity_profile.csv")
+	subdirs = [dir for dir in readdir(pathin) if isdir(joinpath(pathin, dir)) == true]
+
+	# Process first subdirectory and create file
+	impurity_profile = create_impurity_profile(joinpath(pathin, subdirs[1]))
+	CSV.write(csvout, impurity_profile)
+	println("\n---Processed directory $(subdirs[1]) (1 of $(length(subdirs)))---\n")
+
+	for i=2:length(subdirs)
+		impurity_profile = create_impurity_profile(joinpath(pathin, subdirs[i]))
+		CSV.write(csvout, impurity_profile, append=true)
+		println("\n---Processed directory $(subdirs[i]) ($i of $(length(subdirs)))---\n")
+	end
+end
+
+"""
+	create_impurity_profile(pathin)
+Creates and returns impurity profile from all samples in directory pathin
+"""
+function create_impurity_profile(pathin)
+	# Read settings.json
+	json_string = read("settings.json", String)
+	settings_json = JSON3.read(json_string)
+	main_compound_name = settings_json[:main_settings]["main_compound"]
+	IS_name = settings_json[:main_settings]["internal_standard"]
+	main_IS_min_ratio = settings_json[:main_settings]["main/IS min ratio"]
 
 	# Import spectra
-	spectra = batch_import(pathin)
-
+	spectra, metadata_headers = batch_import(pathin, settings_json)
 
 	# Import RT and mz info of valid compounds into DataFrame
 	compounds_csv = CSV.read("compounds.csv", DataFrame)
 	filter!(row -> !(any(ismissing, (row.RT, row.mz)) || any((row.RT, row.mz) .== 0)), compounds_csv)
+	main_compound = filter(row -> row.compound == main_compound_name, compounds_csv)[1, :]
 
 	# Create DataFrame for storing impurity profile (output)
-	compounds_in_profile = filter(row -> !(row.type_int == -10), compounds_csv).compound
+	exclude_list = settings_json[:exclude_from_impurity_profile]
+	compounds_in_profile = filter(row -> !(row.compound in exclude_list), compounds_csv).compound
 	impurity_profiles = DataFrame()
-	insertcols!(impurity_profiles, :item_number => String[])
-	insertcols!(impurity_profiles, :filename => String[])
-	insertcols!(impurity_profiles, :folder => String[])
+	for header in metadata_headers
+		insertcols!(impurity_profiles, Symbol(header) => String[])
+	end
 	for compound_name in compounds_in_profile
 		insertcols!(impurity_profiles, Symbol(compound_name) => Float32[])
 	end
@@ -64,21 +100,24 @@ function main()
 		println("Analysing spectrum $i...")
 		spectrum = spectra[i]["MS1"]
 
-		compound_mz_integrals = analyse_spectrum(spectrum, compounds_csv)
+		compound_mz_integrals = analyse_spectrum(spectrum, compounds_csv, main_compound)
 		# Create impurity profile and add to DataFrame
-		sample_metadata, sample_profile = create_impurity_profile(spectrum, compound_mz_integrals, compounds_csv, compounds_in_profile)
+		sample_metadata, sample_profile = calculate_impurity_profile_values(
+							 spectrum, compound_mz_integrals, compounds_csv, 
+							 compounds_in_profile, metadata_headers,
+							 main_compound, IS_name, main_IS_min_ratio)
 		push!(impurity_profiles, append!(sample_metadata, sample_profile))
 	end
 
-	CSV.write(csvout, impurity_profiles)
+	return impurity_profiles
 end
 
 """
 	analyse_spectrum(spectrum, compounds)
 Analyses all compounds in spectrum and returns dictionary with mz values for each compound
 """
-function analyse_spectrum(spectrum, compounds_csv, compounds_to_analyse=compounds_csv)
-	RT_modifier = determine_RT_modifier(spectrum, compounds_csv)
+function analyse_spectrum(spectrum, compounds_csv, main_compound, compounds_to_analyse=compounds_csv)
+	RT_modifier = determine_RT_modifier(spectrum, main_compound)
 
 	# Create Dict for storing integral for each compound and mz value
 	compound_mz_integrals = Dict(Symbol(compound) => Dict{Symbol, Int}() for compound in compounds_to_analyse.compound)
@@ -125,15 +164,15 @@ end #FUNCTION
 Determines retention time shift of cocaine and returns {RT_actual / RT_predicted}
 
 	return RT_modifier"""
-function determine_RT_modifier(spectrum, compounds)
+function determine_RT_modifier(spectrum, main_compound)
 
 	# Read predicted RT and highest mz value
-	major_compound = filter(row -> row.type_int == -1, compounds)[1, :]
-	RT_predicted = major_compound.RT
-	highest_mz_val = maximum(parse_data(major_compound)[1])
+	# main_compound = filter(row -> row.compound == -1, compounds)[1, :] #TEMP
+	RT_predicted = main_compound.RT
+	highest_mz_val = maximum(parse_data(main_compound)[1])
 
 	# Search for maximum around predicted RT
-	RT_range = (RT_predicted - MAJOR_RT_DEVIATION, RT_predicted + MAJOR_RT_DEVIATION)
+	RT_range = (RT_predicted - MAIN_RT_DEVIATION, RT_predicted + MAIN_RT_DEVIATION)
 	RT_index_range = RT_to_scans(spectrum, RT_range)
 	spectrum_XIC_part = filter_XIC(spectrum, highest_mz_val)[RT_index_range[1] : RT_index_range[2]]
 
@@ -349,46 +388,43 @@ end
 
 
 """
-	create_impurity_profile(spectrum, compound_mz_integrals, impurity_profiles)
-Creates impurity profile and adds it to DataFrame "impurity_profiles"
+	calculate_impurity_profile_values(spectrum, compound_mz_integrals, impurity_profiles)
+Returns metadata, impurity_profile_values
 """
-function create_impurity_profile(spectrum, compound_mz_integrals, compounds_csv, compounds_in_profile)
+function calculate_impurity_profile_values(spectrum, compound_mz_integrals, compounds_csv, 
+										   compounds_in_profile, metadata_headers, 
+										   main_compound, IS_name, main_IS_min_ratio)
 
 	# Retrieve metadata
-	metadata = Array{Any,1}(undef, 3)
-	metadata[1] = spectrum["Sample Name"][1]
-	metadata[2] = spectrum["Filename"][1]
-	metadata[3] = spectrum["Folder Name"][1]
+	metadata = Vector{Any}([spectrum[header] for header in metadata_headers])
 
 	# No cocaine present
 	if compound_mz_integrals == 0
 		return metadata, zeros(length(compounds_in_profile))
 	end
 
-	# Retrieve names of major compound and internal standard, and retrieve minimum ratio
-	major_IS_ratio = parse(Float16, filter(row -> row.type_int == -10, compounds_csv).ratio[1])
-	major_compound = filter(row -> row.type_int == -1, compounds_csv)[1, :]
-	IS_name = filter(row -> row.type_int == -10, compounds_csv).compound[1]
+	# Retrieve names of main compound and internal standard, and retrieve minimum ratio
+	# main_IS_ratio = parse(Float16, filter(row -> row.type_int == -10, compounds_csv).ratio[1]) #TEMP
+	# main_compound = filter(row -> row.compound == main_compound_name, compounds_csv)[1, :] #TEMP
 
-	# Determine integral of highest mz value of major compound
-	major_highest_mz_value = maximum(parse_data(major_compound)[1])
-	major_highest_mz_integral = compound_mz_integrals[Symbol(major_compound.compound)][Symbol(major_highest_mz_value)]
+	# Determine integral of highest mz value of main compound
+	main_highest_mz_value = maximum(parse_data(main_compound)[1])
+	main_highest_mz_integral = compound_mz_integrals[Symbol(main_compound.compound)][Symbol(main_highest_mz_value)]
 
 	# Sum integrals of all mz values of internal standard
 	IS_integral = sum(values(compound_mz_integrals[Symbol(IS_name)]))
 
-
 	impurity_profile_values = zeros(length(compounds_in_profile))
-	# Ratio too low, no significant amount of major compound present 
-	if major_highest_mz_integral / IS_integral < major_IS_ratio || major_highest_mz_integral == 0
+	# Ratio too low, no significant amount of main compound present 
+	if main_highest_mz_integral / IS_integral < main_IS_min_ratio || main_highest_mz_integral == 0
 		return metadata, zeros(length(compounds_in_profile))
-	elseif IS_integral == 0 && major_highest_mz_integral != 0
-		@warn "Major compound detected, but internal standard not detected"
+	elseif IS_integral == 0 && main_highest_mz_integral != 0
+		@warn "main compound detected, but internal standard not detected"
 		return metadata, zeros(length(compounds_in_profile))
 	end
 
 	# Sum all integrals of cocaine
-	major_integral_sum = sum(values(compound_mz_integrals[Symbol(major_compound.compound)]))
+	main_integral_sum = sum(values(compound_mz_integrals[Symbol(main_compound.compound)]))
 	
 	# Calculate percent ratio for all compounds
 	for (i, compound_name) in enumerate(compounds_in_profile)
@@ -403,7 +439,7 @@ function create_impurity_profile(spectrum, compound_mz_integrals, compounds_csv,
 
 		# Calculate percent ratio, set to zero if < 0.05
 		integral_sum = sum(values(mz_dict))
-		percent_ratio = round(integral_sum / major_integral_sum * 100, digits=2)
+		percent_ratio = round(integral_sum / main_integral_sum * 100, digits=2)
 		# percent_ratio = percent_ratio > 0.05 ? percent_ratio : 0 #TEMP
 		impurity_profile_values[i] = percent_ratio
 	end
