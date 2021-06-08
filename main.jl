@@ -73,7 +73,7 @@ Creates and returns impurity profile from all samples in directory pathin
 """
 function create_impurity_profile(pathin)
 	# Read settings.json
-	json_string = read("settings.json", String)
+	json_string = read(joinpath(@__DIR__, "settings.json"), String)
 	settings_json = JSON3.read(json_string)
 	main_compound_name = settings_json[:main_settings]["main_compound"]
 	IS_name = settings_json[:main_settings]["internal_standard"]
