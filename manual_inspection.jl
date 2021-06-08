@@ -127,14 +127,19 @@ end
 function visualize_peak_range(spectrum, compound_name, mz, secondary_ylims=0, predicted_RT=0)
     PLOT_EXTRA_SCANS = 60
 
+    json_string = read(joinpath(@__DIR__, "settings.json"), String)
+	settings_json = JSON3.read(json_string)
+	main_compound_name = settings_json[:main_settings]["main_compound"]
+
     # Read compounds.csv
-	compounds = CSV.read("compounds.csv", DataFrame)
-	filter!(row -> !(any(ismissing, (row.RT, row.mz)) || any((row.RT, row.mz) .== 0)), compounds)
+	compounds_csv = CSV.read("compounds.csv", DataFrame)
+	filter!(row -> !(any(ismissing, (row.RT, row.mz)) || any((row.RT, row.mz) .== 0)), compounds_csv)
 
-    # Retrieve row of compound in compounds.csv
-    compound = filter(row -> row.compound == compound_name, compounds)[1, :]
+    # Retrieve row of compound and main compound from compounds.csv
+    compound = filter(row -> row.compound == compound_name, compounds_csv)[1, :]
+    main_compound = filter(row -> row.compound == main_compound_name, compounds_csv)[1, :]
 
-    RT_modifier = determine_RT_modifier(spectrum, compounds)
+    RT_modifier = determine_RT_modifier(spectrum, main_compound)
 
     # Cocaine not found
     if RT_modifier == -1
@@ -174,7 +179,7 @@ function visualize_peak_range(spectrum, compound_name, mz, secondary_ylims=0, pr
     plot(spectrum_XIC, xlims=_xlims, ylims=(0, maximum(spectrum_XIC[left_bound : right_bound]) * 1.1), 
                xlabel="scan number", ylabel="intensity", label=compound_name, left_margin = 5Plots.mm, 
                                                 legend=:topleft,right_margin = 18Plots.mm, grid=:off)
-    plot!(title="Filename: $(spectrum["Filename"][1]) \nSample Name: $(spectrum["Sample Name"][1]) \nmz: $mz", titlefontsize=7)
+    plot!(title="Filename: $(spectrum["Filename"][1]) \nItem Number: $(spectrum["item_number"][1]) \nmz: $mz", titlefontsize=7)
     vline!([left_bound, right_bound], linestyle=:dash, label="peak cutoffs")
     plot!(pre_bounds, baseline, linestyle=:dash, label="baseline ($(mean(baseline)))", seriescolor=:green)
 
