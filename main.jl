@@ -109,7 +109,9 @@ function create_impurity_profile(pathin)
 							 spectrum, compound_mz_integrals, compounds_csv, 
 							 compounds_in_profile, metadata_headers,
 							 main_compound, IS_name, main_IS_min_ratio)
-		push!(impurity_profiles, append!(sample_metadata, sample_profile))
+		if sample_profile[1] > 0 #TODO excludes samples not containing cocaine, should be done more dynamically
+			push!(impurity_profiles, append!(sample_metadata, sample_profile))
+		end
 	end
 
 	return impurity_profiles
