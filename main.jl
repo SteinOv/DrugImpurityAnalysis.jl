@@ -48,16 +48,19 @@ function main()
 	csvout = joinpath(pathin, "impurity_profile.csv")
 end
 
-function create_impurity_profiles_batch(pathin, pathout=pathin)
+function create_impurity_profiles_batch(pathin, pathout=pathin, start_at=1)
 	csvout = joinpath(pathout, "impurity_profile.csv")
 	subdirs = [dir for dir in readdir(pathin) if isdir(joinpath(pathin, dir)) == true]
-
-	# Process first subdirectory and create file
-	impurity_profile = create_impurity_profile(joinpath(pathin, subdirs[1]))
-	CSV.write(csvout, impurity_profile)
-	println("\n---Processed directory $(subdirs[1]) (1 of $(length(subdirs)))---\n")
-
-	for i=2:length(subdirs)
+	
+	if start_at == 1
+		# Process first subdirectory and create file
+		impurity_profile = create_impurity_profile(joinpath(pathin, subdirs[1]))
+		CSV.write(csvout, impurity_profile)
+		println("\n---Processed directory $(subdirs[1]) (1 of $(length(subdirs)))---\n")
+	end
+	
+	start = start_at <= 2 ? 2 : start_at
+	for i=start:length(subdirs)
 		impurity_profile = create_impurity_profile(joinpath(pathin, subdirs[i]))
 		CSV.write(csvout, impurity_profile, append=true)
 		println("\n---Processed directory $(subdirs[i]) ($i of $(length(subdirs)))---\n")
