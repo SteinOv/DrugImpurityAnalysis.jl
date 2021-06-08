@@ -9,7 +9,7 @@ for /D %%d in (.\*) do (
 
     "P:\ProteoWizard\ProteoWizard 3.0.21063.9e153e63f\MSconvert.exe" "%%d\*.D" "--mzXML" "--32" "-o" "%%~nd"
     @echo ----------------------------Retrieving sample info----------------------------
-    for /D %%D in (%%d\*) do (
+    for /D %%D in ("%%d"\*) do (
         copy "%%D\AcqData\sample_info.xml" "%%d\%%~nD_sample_info.xml"
     )
 

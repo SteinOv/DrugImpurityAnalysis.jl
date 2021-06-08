@@ -14,9 +14,9 @@ IF /I "%AREYOUSURE%" NEQ "Y" (
 for /D %%d in (.\*) do (
 @echo ---------------------------Processing folder: %%~nd----------------------------
 
-    for /D %%D in (%%d\*) do (
+    for /D %%D in ("%%d"\*) do (
         set "folder_extension=%%~xD"
-        if !folder_extension!==.D RD /S /Q %%D
+        if !folder_extension!==.D RD /S /Q "%%D"
         
     )
 
