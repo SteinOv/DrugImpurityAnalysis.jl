@@ -33,21 +33,6 @@ const OVERLAP_CONSECUTIVE_BELOW_MEDIAN = 2
 const OVERLAP_CONSECUTIVE_ABOVE_MEDIAN = 5
 
 
-
-function main()
-
-	# Specify path
-	data_folder = joinpath(@__DIR__, "data")
-	subfolder = "cocabricks"
-	pathin = joinpath(data_folder, subfolder)
-	impurity_profiles = create_impurity_profile(pathin)
-	csvout = joinpath(pathin, "impurity_profile.csv")
-	CSV.write(csvout, impurity_profiles)
-
-	pathin = "D:\\data Stein gcms\\2019"
-	csvout = joinpath(pathin, "impurity_profile.csv")
-end
-
 function create_impurity_profiles_batch(pathin, pathout=pathin, start_at=1)
 	csvout = joinpath(pathout, "impurity_profile.csv")
 	subdirs = [dir for dir in readdir(pathin) if isdir(joinpath(pathin, dir)) == true]
@@ -172,7 +157,6 @@ Determines retention time shift of cocaine and returns {RT_actual / RT_predicted
 function determine_RT_modifier(spectrum, main_compound)
 
 	# Read predicted RT and highest mz value
-	# main_compound = filter(row -> row.compound == -1, compounds)[1, :] #TEMP
 	RT_predicted = main_compound.RT
 	highest_mz_val = maximum(parse_data(main_compound)[1])
 
@@ -286,7 +270,7 @@ function determine_overlap(spectrum_XIC, max_scan, RT_overlap_vals, spectrum)
 				# Previously consecutively below median and now consecutively above median
 				elseif reached_below && above_consecutive >= OVERLAP_CONSECUTIVE_ABOVE_MEDIAN
 					overlap_range = (scan - OVERLAP_CONSECUTIVE_ABOVE_MEDIAN * direction):direction:spectrum_scan_range[end]
-					# overlap_max_scan = overlap_range[begin] + direction * (findmax(spectrum_XIC[overlap_range])[2] - 1)#TEMP
+
 					# Bounds for search_peak
 					left_scan = direction == -1 ? overlap_range[end] : overlap_range[begin]
 					right_scan = direction == -1 ? overlap_range[begin] : overlap_range[end]
@@ -408,10 +392,6 @@ function calculate_impurity_profile_values(spectrum, compound_mz_integrals, comp
 		return metadata, zeros(length(compounds_in_profile))
 	end
 
-	# Retrieve names of main compound and internal standard, and retrieve minimum ratio
-	# main_IS_ratio = parse(Float16, filter(row -> row.type_int == -10, compounds_csv).ratio[1]) #TEMP
-	# main_compound = filter(row -> row.compound == main_compound_name, compounds_csv)[1, :] #TEMP
-
 	# Determine integral of highest mz value of main compound
 	main_highest_mz_value = maximum(parse_data(main_compound)[1])
 	main_highest_mz_integral = compound_mz_integrals[Symbol(main_compound.compound)][Symbol(main_highest_mz_value)]
@@ -442,10 +422,9 @@ function calculate_impurity_profile_values(spectrum, compound_mz_integrals, comp
 			continue
 		end
 
-		# Calculate percent ratio, set to zero if < 0.05
+		# Calculate percent ratio
 		integral_sum = sum(values(mz_dict))
 		percent_ratio = round(integral_sum / main_integral_sum * 100, digits=2)
-		# percent_ratio = percent_ratio > 0.05 ? percent_ratio : 0 #TEMP
 		impurity_profile_values[i] = percent_ratio
 	end
 
