@@ -117,6 +117,7 @@ function batch_import(pathin, settings_json)
 	# Retrieve filters
 	filters = settings_json[Symbol("filters")]
 	filters_must_contain = Dict(i["element_name"] => i["value"] for i in filters if i["filter"] == "must_contain")
+	empty_field_allowed = Dict(i["element_name"] => i["empty_field_allowed"] for i in filters)
 
 
 
@@ -130,7 +131,7 @@ function batch_import(pathin, settings_json)
 		sample_info = retrieve_sample_info(pathin, filename, element_names)
 		filters_accepted = true
 		for (element_name, value) in filters_must_contain
-			if !contains(sample_info[element_name], value)
+			if !(contains(sample_info[element_name], value) || (empty_field_allowed[element_name] && isempty(sample_info[element_name])))
 				filters_accepted = false
 				break
 			end
@@ -158,15 +159,20 @@ function batch_import(pathin, settings_json)
 end
 
 function retrieve_sample_info(pathin, filename, element_names)
-	# Path to xml file which contains Sample Name
-	folder_name = filename[begin:end-5] * "D"
-	folder_loc = joinpath(pathin, folder_name)
-	sample_info_file = joinpath(folder_loc, "AcqData\\sample_info.xml")
+	# Look for file in same folder (created by .bat file)
+	filename_without_ext = filename[begin:end-6]
+	sample_info_file = joinpath(pathin, filename_without_ext*"_sample_info.xml")
 
-	# File does not exist
+	# If it does not exist, look for file in .D folder
 	if !isfile(sample_info_file)
-		@warn "$(sample_info_file) does not exist, metadata will not be saved"
-		return ""
+		folder_loc = joinpath(pathin, filename_without_ext*".D")
+		sample_info_file = joinpath(folder_loc, "AcqData\\sample_info.xml")
+	end
+
+	# File does not exist at all
+	if !isfile(sample_info_file)
+		@warn "Sample info file for $filename_without_ext does not exist, metadata will not be saved"
+		return Dict(element_name => "" for element_name in element_names)
 	end
 
 	# Load xml file into array
