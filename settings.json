@@ -9,6 +9,11 @@
             "type": "sample_info_xml",
             "header": "item_number",
             "element_name": "Sample Name"
+        },
+        {
+            "type": "sample_info_xml",
+            "header": "DateTime (y-m-d)", 
+            "element_name": "AcqTime"
         }
     ],
     "filters" : [ 
@@ -16,7 +21,8 @@
         "type": "sample_info_xml",
         "element_name": "Comment",
         "filter": "must_contain",
-        "value": "cocaine"
+        "value": "cocaine",
+        "empty_field_allowed": true
         } 
     ],
     "exclude_from_impurity_profile": [
