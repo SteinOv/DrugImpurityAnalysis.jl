@@ -344,8 +344,8 @@ Set bounds to baseline crossing closest to peak, or minimum if it does not cross
 """
 function determine_bounds(spectrum_XIC, max_scan, overlap_max_left, overlap_max_right, baseline, pre_bounds)
 	# Set bound to max of overlapping peak if it exists
-	pre_left_bound = overlap_max_left > 0 ? overlap_max_left : pre_bounds[begin]
-	pre_right_bound = overlap_max_right > 0 ? overlap_max_right : pre_bounds[end]
+	pre_left_bound = overlap_max_left > 0 && overlap_max_left > pre_bounds[begin] ? overlap_max_left : pre_bounds[begin]
+	pre_right_bound = overlap_max_right > 0 && overlap_max_right < pre_bounds[end] ? overlap_max_right : pre_bounds[end]
 
 	spectrum_part = spectrum_XIC[pre_left_bound:pre_right_bound]
 	part_max_scan = max_scan - pre_left_bound + 1
