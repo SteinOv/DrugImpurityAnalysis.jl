@@ -32,7 +32,7 @@
         "impurities": [
             "tropacocaine",
             "norcocaine",
-            "N-benzoylcocaine",
+            "N-benzoylnormethylecgonine",
             "cis-cinnamoylcocaine",
             "trans-cinnamoylcocaine"
         ],
@@ -42,12 +42,24 @@
             "tetracaine",
             "benzocaine",
             "caffeine",
-            "acetylsalicylic acid",
             "phenacetin",
             "ibuprofen",
-            "levamisole",
-            "hydroxyzine",
-            "ketamine"
+            "levamisole"
+        ],
+        "all" : [
+            "tropacocaine",
+            "norcocaine",
+            "N-benzoylnormethylecgonine",
+            "cis-cinnamoylcocaine",
+            "trans-cinnamoylcocaine",
+            "lidocaine",
+            "procaine",
+            "tetracaine",
+            "benzocaine",
+            "caffeine",
+            "phenacetin",
+            "ibuprofen",
+            "levamisole"       
         ]
     }
     
