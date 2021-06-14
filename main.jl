@@ -6,11 +6,13 @@ using DataFrames
 using LightXML
 using JSON3
 using Dates
+using Statistics
 
 using BenchmarkTools
 
 include("helpers.jl")
 include("manual_inspection.jl")
+include("analysis.jl")
 
 const MAIN_RT_DEVIATION = 1 # Absolute maximum shift of cocaine peak
 

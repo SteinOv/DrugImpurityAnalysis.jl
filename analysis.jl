@@ -56,3 +56,92 @@ end
 
 # --------------------------------------------------------------------
 
+"""
+    find_similar_samples(sample, impurity_profile_csv, compound_group, max_deviation_fraction, date_range=0)
+Looks for similar samples in impurity profile, samples are determined as similar if for each compound: 
+{difference values / mean values <= max_deviation_fraction}
+
+sample can be input as DataFrameRow or as index (Int) within the impurity profile
+
+"""
+function find_similar_samples(sample::DataFrameRow, impurity_profile_csv, compound_group, max_deviation_fraction, date_range=0)
+
+    # Read impurity profile and filter dates if given
+    impurity_profile = CSV.read(impurity_profile_csv, DataFrame)
+    if date_range != 0
+        date_range = sort(Date.(date_range))
+        filter!(row -> Date(row."DateTime (y-m-d)"[1:10]) >= date_range[1] && Date(row."DateTime (y-m-d)"[1:10]) <= date_range[2] , impurity_profile)
+    end
+
+    # Read settings.json and retrieve compound names from group
+    json_string = read(joinpath(@__DIR__, "settings.json"), String)
+	settings_json = JSON3.read(json_string)
+    compound_names = settings_json[:compound_groups][compound_group]
+
+    # filter columns of impurity profile and sample based on compound group
+    impurity_profile_filtered = select(impurity_profile, compound_names)
+    select!(DataFrame(sample), compound_names)[1, :]
+
+    # Determine similar samples
+    similar_samples = DataFrame()
+    for (i, row) in enumerate(eachrow(impurity_profile_filtered))
+        meet_req = true
+        # Compare values of both samples for all compounds
+        for compound in compound_names
+            samples_mean = mean((row[compound], sample[compound]))
+            sample_deviation = abs(samples_mean - sample[compound]) / samples_mean
+            if sample_deviation > max_deviation_fraction
+                meet_req = false
+                break
+            end
+        end
+        if meet_req
+            push!(similar_samples, impurity_profile[i, :])
+        end
+    end
+
+    return similar_samples
+end
+
+# Sample input as index within impurity profile
+function find_similar_samples(sample::Int, impurity_profile_csv, compound_group, max_deviation_fraction, date_range=0)
+
+    # Read impurity profile and filter dates if given
+    impurity_profile = CSV.read(impurity_profile_csv, DataFrame)
+    if date_range != 0
+        date_range = sort(Date.(date_range))
+        filter!(row -> Date(row."DateTime (y-m-d)"[1:10]) >= date_range[1] && Date(row."DateTime (y-m-d)"[1:10]) <= date_range[2] , impurity_profile)
+    end
+
+    # Retrieve sample as DataFrameRow
+    sample = impurity_profile[sample, :]
+
+    # Read settings.json and retrieve compound names from group
+    json_string = read(joinpath(@__DIR__, "settings.json"), String)
+	settings_json = JSON3.read(json_string)
+    compound_names = settings_json[:compound_groups][compound_group]
+
+    # filter columns of impurity profile and sample based on compound group
+    impurity_profile_filtered = select(impurity_profile, compound_names)
+    select!(DataFrame(sample), compound_names)[1, :]
+
+    # Determine similar samples
+    similar_samples = DataFrame()
+    for (i, row) in enumerate(eachrow(impurity_profile_filtered))
+        meet_req = true
+        # Compare values of both samples for all compounds
+        for compound in compound_names
+            samples_mean = mean((row[compound], sample[compound]))
+            sample_deviation = abs(samples_mean - sample[compound]) / samples_mean
+            if sample_deviation > max_deviation_fraction
+                meet_req = false
+                break
+            end
+        end
+        if meet_req
+            push!(similar_samples, impurity_profile[i, :])
+        end
+    end
+
+    return similar_samples
+end
