@@ -5,7 +5,7 @@ Searches through impurity profile and determines percentage occurrence of compou
 Can also search for a combination of compounds if compound_name and minimum_value are given as vector
 date_range format: [yyyy-mm-dd, yyyy-mm-dd]
 """
-function compound_percentage_occurrence(compound_name::String, impurity_profile_csv, date_range, minimum_value::Int)
+function compound_percentage_occurrence(compound_name::String, impurity_profile_csv, date_range, minimum_value::Number)
     # Read impurity profile and filter on dates
     impurity_profile = CSV.read(impurity_profile_csv, DataFrame)
     date_range = sort(Date.(date_range))
@@ -22,7 +22,7 @@ function compound_percentage_occurrence(compound_name::String, impurity_profile_
 end
 
 # Searches for combination of compounds
-function compound_percentage_occurrence(compound_name::Vector{String}, impurity_profile_csv, date_range, minimum_value::Vector{Int})
+function compound_percentage_occurrence(compound_name::Vector{String}, impurity_profile_csv, date_range, minimum_value::Vector{Number})
     if length(compound_name) != length(minimum_value)
         @error "compound_name and minimum_value not same length"
     end
