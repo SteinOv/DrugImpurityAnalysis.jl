@@ -195,3 +195,26 @@ function visualize_peak_range(spectrum, compound_name, mz, secondary_ylims=0, pr
     return plot!()
 end
 
+
+"""
+    function sort_spectra(spectra, sort_by)
+Sorts spectra by chosen header
+"""
+function sort_spectra(spectra, sort_by)
+    sort!(spectra, by = x -> x["MS1"][sort_by])
+end
+
+"""
+    retrieve_spectrum(spectra, header, value)
+Returns first spectrum found that has chosen value under chosen header
+"""
+function retrieve_spectrum(spectra, header, value)
+    for spectrum in spectra
+        if spectrum["MS1"][header] == value
+            return spectrum["MS1"]
+        end
+    end
+    
+    println("Spectrum Not Found")
+    return 0
+end
