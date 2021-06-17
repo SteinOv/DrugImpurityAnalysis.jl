@@ -183,10 +183,10 @@ function visualize_peak_range(spectrum, compound_name, mz, secondary_ylims=0, pr
     end
     _xlims = (left_bound - PLOT_EXTRA_SCANS, right_bound + PLOT_EXTRA_SCANS)
 
-    plot(spectrum_XIC, xlims=_xlims, ylims=(0, maximum(spectrum_XIC[left_bound : right_bound]) * 1.1), 
+    plot(_xlims[1]:_xlims[2], spectrum_XIC[_xlims[1]:_xlims[2]], xlims=_xlims, ylims=(0, maximum(spectrum_XIC[left_bound : right_bound]) * 1.1), 
                xlabel="scan number", ylabel="intensity", label=compound_name, left_margin = 5Plots.mm, 
                                                 legend=:topleft,right_margin = 18Plots.mm, grid=:off)
-    plot!(title="Filename: $(spectrum["Filename"][1]) \nItem Number: $(spectrum["item_number"][1]) \nmz: $mz", titlefontsize=7)
+    plot!(title="Filename: $(spectrum["Filename"]) \nItem Number: $(spectrum["item_number"]) \nmz: $mz", titlefontsize=7)
     vline!([left_bound, right_bound], linestyle=:dash, label="peak cutoffs")
     plot!(pre_bounds, baseline, linestyle=:dash, label="baseline ($(mean(baseline)))", seriescolor=:green)
 
@@ -194,7 +194,7 @@ function visualize_peak_range(spectrum, compound_name, mz, secondary_ylims=0, pr
 
         plot!(twinx(), pre_bounds, baseline, xlims=_xlims, linestyle=:dot, ylims=(0, secondary_ylims), label="", seriescolor=:green, xaxis=:false)
 
-        plot!(twinx(), spectrum_XIC, xlims=_xlims,
+        plot!(twinx(), _xlims[1]:_xlims[2], spectrum_XIC[_xlims[1]:_xlims[2]], xlims=_xlims,
         ylims=(0, secondary_ylims), linestyle=:dot, ylabel="intensity (zoomed)", label="", grid=:off)
         # plot!(linestyle=:dot)
     end
