@@ -76,30 +76,37 @@ end
     mz_integrals_to_csv(spectra, compound_name, compounds)  
 Determine mz integrals for specific compound and output to csv
 """
-function mz_integrals_to_csv(spectra, compound_name)
+function mz_integrals_to_csv(pathin, compound_name)
+    json_string = read(joinpath(@__DIR__, "settings.json"), String)
+	settings_json = JSON3.read(json_string)
+	main_compound_name = settings_json[:main_settings]["main_compound"]
+
+    spectra, metadata_headers = batch_import(pathin, settings_json)
 
     # Import RT and mz info of valid compounds into DataFrame
 	compounds_csv = CSV.read("compounds.csv", DataFrame)
-    compound = filter(row -> row.compound == compound_name, compounds_csv)
+    compound_to_analyse = filter(row -> row.compound == compound_name, compounds_csv) # DataFrame
+    main_compound = filter(row -> row.compound == main_compound_name, compounds_csv)[1, :] # DataFrameRow
 
-	# Create DataFrame for storing mz integrals
-	mz_values = parse_data(compound[1, :])[1]
-	mz_integrals_dataframe = DataFrame()
-	insertcols!(mz_integrals_dataframe, :item_number => String[])
-	insertcols!(mz_integrals_dataframe, :filename => String[])
-	insertcols!(mz_integrals_dataframe, :folder => String[])
-	for mz in mz_values
-		insertcols!(mz_integrals_dataframe, Symbol(mz) => Int[])
+
+    # Create DataFrame for storing mz integrals
+    mz_values = parse_data(compound_to_analyse[1, :])[1]
+    mz_integrals_dataframe = DataFrame()
+	for header in metadata_headers
+		insertcols!(mz_integrals_dataframe, Symbol(header) => String[])
 	end
-
+	for mz in mz_values
+		insertcols!(mz_integrals_dataframe, Symbol(mz) => Float32[])
+	end
+	
     # Analyse all spectra
 	for i=1:length(spectra)
 		println("Analysing spectrum $i...")
         spectrum = spectra[i]["MS1"]
 
         # Determine mz integrals, retrieve metadata, and store in DataFrame
-        mz_integrals = analyse_spectrum(spectrum, compounds_csv, compound)
-        sample_metadata = create_impurity_profile(spectrum, 0, 0, 0)[1]
+        mz_integrals = analyse_spectrum(spectrum, compounds_csv, main_compound, compound_to_analyse)
+        sample_metadata = Vector{Any}([spectrum[header] for header in metadata_headers])
         if mz_integrals == 0
             push!(mz_integrals_dataframe, append!(sample_metadata, zeros(length(mz_values))))
         else
