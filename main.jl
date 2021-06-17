@@ -20,12 +20,12 @@ const MAX_MZ_DEVIATION = 0.5 # Maximum deviation from given mz value in XIC spec
 const MAX_RT_SHIFT = 0.05 # Maximum amount that RT can shift from determined RT
 
 # 40 scans is 0.1 minute
-const MAX_SCANS_PEAK_SEARCH = 20 # Used for differentiating peak from noise
+const MAX_SCANS_PEAK_SEARCH = 16 # Used for differentiating peak from noise
 const MAX_SCANS_PEAK_LEFT = 40 # Bounds for peak integration (left)
 const MAX_SCANS_PEAK_RIGHT = 80 # Bounds for peak integration (right)
 
 # If fraction of median/mean crossings is above either value, noise instead of peak
-const NOISE_MEDIAN_CROSSINGS_FRACTION = 0.40
+const NOISE_MEDIAN_CROSSINGS_FRACTION = 0.50
 const NOISE_MEAN_CROSSINGS_FRACTION = 0.25
 
 # Amount of scans for determining baseline
