@@ -35,23 +35,21 @@ const BASELINE_SCANS = 20
 const OVERLAP_CONSECUTIVE_BELOW_MEDIAN = 2
 const OVERLAP_CONSECUTIVE_ABOVE_MEDIAN = 5
 
-
-function create_impurity_profiles_batch(pathin, pathout=pathin, start_at=1)
+"""
+	create_impurity_profiles_batch(pathin; pathout=pathin, start_at=1, _append=false)
+Creates impurity profiles from all folders in pathin and writes to one csv file at pathout
+start_at: which folder to start (ordered by folder name), skips all folders prior
+_append: set to true if appending to already existing csv file
+"""
+function create_impurity_profiles_batch(pathin::String; pathout::String=pathin, start_at::Int=1, _append::Bool=false)
 	csvout = joinpath(pathout, "impurity_profile.csv")
 	subdirs = [dir for dir in readdir(pathin) if isdir(joinpath(pathin, dir)) == true]
 	
-	if start_at == 1
-		# Process first subdirectory and create file
-		impurity_profile = create_impurity_profile(joinpath(pathin, subdirs[1]))
-		CSV.write(csvout, impurity_profile)
-		println("\n---Processed directory $(subdirs[1]) (1 of $(length(subdirs)))---\n")
-	end
-	
-	start = start_at <= 2 ? 2 : start_at
-	for i=start:length(subdirs)
+	for i=start_at:length(subdirs)
 		impurity_profile = create_impurity_profile(joinpath(pathin, subdirs[i]))
-		CSV.write(csvout, impurity_profile, append=true)
+		CSV.write(csvout, impurity_profile, append=_append)
 		println("\n---Processed directory $(subdirs[i]) ($i of $(length(subdirs)))---\n")
+		_append = true
 	end
 end
 
