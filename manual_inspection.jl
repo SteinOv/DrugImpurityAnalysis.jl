@@ -137,6 +137,7 @@ function visualize_peak_range(spectrum, compound_name, mz, secondary_ylims=0, pr
     json_string = read(joinpath(@__DIR__, "settings.json"), String)
 	settings_json = JSON3.read(json_string)
 	main_compound_name = settings_json[:main_settings]["main_compound"]
+    IS_name = settings_json[:main_settings]["internal_standard"]
 
     # Read compounds.csv
 	compounds_csv = CSV.read("compounds.csv", DataFrame)
@@ -145,8 +146,9 @@ function visualize_peak_range(spectrum, compound_name, mz, secondary_ylims=0, pr
     # Retrieve row of compound and main compound from compounds.csv
     compound = filter(row -> row.compound == compound_name, compounds_csv)[1, :]
     main_compound = filter(row -> row.compound == main_compound_name, compounds_csv)[1, :]
+    internal_standard = filter(row -> row.compound == IS_name, compounds_csv)[1, :]
 
-    RT_modifier = determine_RT_modifier(spectrum, main_compound)
+    RT_modifier = determine_RT_modifier(spectrum, main_compound, internal_standard)
 
     # Cocaine not found
     if RT_modifier == -1
