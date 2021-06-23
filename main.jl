@@ -54,10 +54,11 @@ function create_impurity_profiles_batch(pathin::String; pathout::String=pathin, 
 end
 
 """
-	create_impurity_profile(pathin)
+	create_impurity_profile(pathin; csvout=nothing)
 Creates and returns impurity profile from all samples in directory pathin
+Writes impurity profile to csvout if given
 """
-function create_impurity_profile(pathin)
+function create_impurity_profile(pathin; csvout=nothing)
 	# Read settings.json
 	json_string = read(joinpath(@__DIR__, "settings.json"), String)
 	settings_json = JSON3.read(json_string)
@@ -100,11 +101,16 @@ function create_impurity_profile(pathin)
 		end
 	end
 
+	# Write to csv if csvout is given
+	if !isnothing(csvout)
+		CSV.write(csvout, impurity_profiles)
+	end
+
 	return impurity_profiles
 end
 
 """
-	analyse_spectrum(spectrum, compounds)
+	analyse_spectrum(spectrum, compounds_csv, main_compound; compounds_to_analyse=compounds_csv)
 Analyses all compounds in spectrum and returns dictionary with mz values for each compound
 """
 function analyse_spectrum(spectrum, compounds_csv, main_compound, compounds_to_analyse=compounds_csv)
