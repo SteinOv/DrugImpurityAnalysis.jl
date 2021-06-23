@@ -37,20 +37,20 @@ const OVERLAP_CONSECUTIVE_BELOW_MEDIAN = 2
 const OVERLAP_CONSECUTIVE_ABOVE_MEDIAN = 5
 
 """
-	create_impurity_profiles_batch(pathin; pathout=pathin, start_at=1, _append=false)
+	create_impurity_profiles_batch(pathin; pathout=pathin, start_at=1, append=false)
 Creates impurity profiles from all folders in pathin and writes to one csv file at pathout
 start_at: which folder to start (ordered by folder name), skips all folders prior
-_append: set to true if appending to already existing csv file
+append: set to true if appending to already existing csv file
 """
-function create_impurity_profiles_batch(pathin::String; pathout::String=pathin, start_at::Int=1, _append::Bool=false)
+function create_impurity_profiles_batch(pathin::String; pathout::String=pathin, start_at::Int=1, append::Bool=false)
 	csvout = joinpath(pathout, "impurity_profile.csv")
 	subdirs = [dir for dir in readdir(pathin) if isdir(joinpath(pathin, dir)) == true]
 	
 	for i=start_at:length(subdirs)
 		impurity_profile = create_impurity_profile(joinpath(pathin, subdirs[i]))
-		CSV.write(csvout, impurity_profile, append=_append)
+		CSV.write(csvout, impurity_profile, append=append)
 		println("\n---Processed directory $(subdirs[i]) ($i of $(length(subdirs)))---\n")
-		_append = true
+		append = true
 	end
 end
 
@@ -112,7 +112,7 @@ function create_impurity_profile(pathin; csvout=nothing)
 end
 
 """
-	analyse_spectrum(spectrum, compounds_csv, main_compound; compounds_to_analyse=compounds_csv)
+	analyse_spectrum(spectrum, compounds_csv, main_compound, internal_standard)
 Analyses all compounds in spectrum and returns dictionary with mz values for each compound
 """
 function analyse_spectrum(spectrum, compounds_to_analyse, main_compound, internal_standard)
