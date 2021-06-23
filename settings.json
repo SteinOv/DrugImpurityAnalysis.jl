@@ -2,7 +2,7 @@
     "main_settings" : {
         "main_compound": "cocaine",
         "internal_standard": "C28",
-        "main/IS min ratio": 0.1
+        "main/IS min ratio": 0.02
     },
     "output_metadata":[
         {
