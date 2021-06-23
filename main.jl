@@ -14,7 +14,8 @@ include("helpers.jl")
 include("manual_inspection.jl")
 include("analysis.jl")
 
-const MAIN_RT_DEVIATION = 1 # Absolute maximum shift of cocaine peak
+const MAIN_RT_DEVIATION = 1 # Absolute maximum shift of cocaine and IS peak
+const MAX_RT_MODIFIER_DIFFERENCE = 0.015 # Difference RT_modifier cocaine and IS must be lower or equal
 
 const MAX_MZ_DEVIATION = 0.5 # Maximum deviation from given mz value in XIC spectrum
 const MAX_RT_SHIFT = 0.05 # Maximum amount that RT can shift from determined RT
@@ -73,6 +74,7 @@ function create_impurity_profile(pathin; csvout=nothing)
 	compounds_csv = CSV.read("compounds.csv", DataFrame)
 	filter!(row -> !(any(ismissing, (row.RT, row.mz)) || any((row.RT, row.mz) .== 0)), compounds_csv)
 	main_compound = filter(row -> row.compound == main_compound_name, compounds_csv)[1, :]
+	internal_standard = filter(row -> row.compound == IS_name, compounds_csv)[1, :]
 
 	# Create DataFrame for storing impurity profile (output)
 	exclude_list = settings_json[:exclude_from_impurity_profile]
@@ -90,7 +92,7 @@ function create_impurity_profile(pathin; csvout=nothing)
 		println("Analysing spectrum $i...")
 		spectrum = spectra[i]["MS1"]
 
-		compound_mz_integrals = analyse_spectrum(spectrum, compounds_csv, main_compound)
+		compound_mz_integrals = analyse_spectrum(spectrum, compounds_csv, main_compound, internal_standard)
 		# Create impurity profile and add to DataFrame
 		sample_metadata, sample_profile = calculate_impurity_profile_values(
 							 spectrum, compound_mz_integrals, compounds_csv, 
@@ -113,8 +115,8 @@ end
 	analyse_spectrum(spectrum, compounds_csv, main_compound; compounds_to_analyse=compounds_csv)
 Analyses all compounds in spectrum and returns dictionary with mz values for each compound
 """
-function analyse_spectrum(spectrum, compounds_csv, main_compound, compounds_to_analyse=compounds_csv)
-	RT_modifier = determine_RT_modifier(spectrum, main_compound)
+function analyse_spectrum(spectrum, compounds_to_analyse, main_compound, internal_standard)
+	RT_modifier = determine_RT_modifier(spectrum, main_compound, internal_standard)
 
 	# Create Dict for storing integral for each compound and mz value
 	compound_mz_integrals = Dict(Symbol(compound) => Dict{Symbol, Int}() for compound in compounds_to_analyse.compound)
@@ -161,26 +163,38 @@ end #FUNCTION
 Determines retention time shift of cocaine and returns {RT_actual / RT_predicted}
 
 	return RT_modifier"""
-function determine_RT_modifier(spectrum, main_compound)
+function determine_RT_modifier(spectrum, main_compound, internal_standard)
 
-	# Read predicted RT and highest mz value
-	RT_predicted = main_compound.RT
-	highest_mz_val = maximum(parse_data(main_compound)[1])
+	RT_modifiers = Vector{Float32}()
+	for compound in (main_compound, internal_standard)
+		# Read predicted RT and highest mz value
+		RT_predicted = compound.RT
+		highest_mz_val = maximum(parse_data(compound)[1])
 
-	# Search for maximum around predicted RT
-	RT_range = (RT_predicted - MAIN_RT_DEVIATION, RT_predicted + MAIN_RT_DEVIATION)
-	RT_index_range = RT_to_scans(spectrum, RT_range)
-	spectrum_XIC_part = filter_XIC(spectrum, highest_mz_val)[RT_index_range[1] : RT_index_range[2]]
+		# Search for maximum around predicted RT
+		RT_range = (RT_predicted - MAIN_RT_DEVIATION, RT_predicted + MAIN_RT_DEVIATION)
+		RT_index_range = RT_to_scans(spectrum, RT_range)
+		spectrum_XIC_part = filter_XIC(spectrum, highest_mz_val)[RT_index_range[1] : RT_index_range[2]]
 
-	# No peak at all
-	if maximum(spectrum_XIC_part) <= 0
+		# No peak at all
+		if maximum(spectrum_XIC_part) <= 0
+			@info "No internal standard and/or cocaine found"
+			return -1
+		end
+
+		max_scan = findmax(spectrum_XIC_part)[2] + RT_index_range[1] - 1
+		RT_actual = spectrum["Rt"][max_scan]
+		push!(RT_modifiers, round(RT_actual / RT_predicted, digits=3))
+	end
+
+	@info "RT_modifier difference" abs(RT_modifiers[1] - RT_modifiers[2])
+
+	if abs(RT_modifiers[1] - RT_modifiers[2]) > MAX_RT_MODIFIER_DIFFERENCE
+		@info "No internal standard and/or cocaine found"
 		return -1
 	end
 
-	max_scan = findmax(spectrum_XIC_part)[2] + RT_index_range[1] - 1
-	RT_actual = spectrum["Rt"][max_scan]
-
-	return round(RT_actual / RT_predicted, digits=3)
+	return round(mean(RT_modifiers), digits=3)
 end
 
 """
