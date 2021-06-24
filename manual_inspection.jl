@@ -80,6 +80,7 @@ function mz_integrals_to_csv(pathin, compound_name)
     json_string = read(joinpath(@__DIR__, "settings.json"), String)
 	settings_json = JSON3.read(json_string)
 	main_compound_name = settings_json[:main_settings]["main_compound"]
+    IS_name = settings_json[:main_settings]["internal_standard"]
 
     spectra, metadata_headers = batch_import(pathin, settings_json)
 
@@ -87,7 +88,7 @@ function mz_integrals_to_csv(pathin, compound_name)
 	compounds_csv = CSV.read("compounds.csv", DataFrame)
     compound_to_analyse = filter(row -> row.compound == compound_name, compounds_csv) # DataFrame
     main_compound = filter(row -> row.compound == main_compound_name, compounds_csv)[1, :] # DataFrameRow
-
+    internal_standard = filter(row -> row.compound == IS_name, compounds_csv)[1, :] # DataFrameRow
 
     # Create DataFrame for storing mz integrals
     mz_values = parse_data(compound_to_analyse[1, :])[1]
@@ -105,7 +106,7 @@ function mz_integrals_to_csv(pathin, compound_name)
         spectrum = spectra[i]["MS1"]
 
         # Determine mz integrals, retrieve metadata, and store in DataFrame
-        mz_integrals = analyse_spectrum(spectrum, compounds_csv, main_compound, compound_to_analyse)
+        mz_integrals = analyse_spectrum(spectrum, compounds_csv, main_compound, internal_standard)
         sample_metadata = Vector{Any}([spectrum[header] for header in metadata_headers])
         if mz_integrals == 0
             push!(mz_integrals_dataframe, append!(sample_metadata, zeros(length(mz_values))))
