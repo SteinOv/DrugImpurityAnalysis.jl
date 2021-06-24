@@ -1,4 +1,3 @@
-using MS_Import
 using Plots
 using Printf
 using CSV
@@ -13,6 +12,7 @@ using BenchmarkTools
 include("helpers.jl")
 include("manual_inspection.jl")
 include("analysis.jl")
+include("MS_Import_light.jl")
 
 const MAIN_RT_DEVIATION = 1 # Absolute maximum shift of cocaine and IS peak
 const MAX_RT_MODIFIER_DIFFERENCE = 0.015 # Difference RT_modifier cocaine and IS must be lower or equal
