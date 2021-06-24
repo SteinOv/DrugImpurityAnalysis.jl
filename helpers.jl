@@ -91,10 +91,11 @@ function parse_data(row)
 end
 
 """
-	batch_import(pathin)
+	batch_import(pathin, settings_json; use_filters=true)
 Returns list containing all imported spectra from folder and metadata headers
+Set use_filters to false to ignore filters and import all spectra, 
 """
-function batch_import(pathin, settings_json)
+function batch_import(pathin, settings_json; use_filters=true)
 	
 	files = readdir(pathin, sort=false)
 	files_supported = zeros(Bool, length(files),1)
@@ -137,8 +138,8 @@ function batch_import(pathin, settings_json)
 			end
 		end
 
-		if filters_accepted == false
-			println("Spectrum $(i[1]) of $num_of_spectra did not meet filter requirements")
+		if filters_accepted == false && use_filters == true
+			@info "Spectrum $(i[1]) of $num_of_spectra did not meet filter requirements"
 			continue
 		end
 
@@ -152,7 +153,7 @@ function batch_import(pathin, settings_json)
 		spectrum["MS1"]["Folder Name"] = split(pathin, "\\")[end]
 		
 
-		println("Read spectra $(i[1]) of $num_of_spectra")
+		@info "Read spectra $(i[1]) of $num_of_spectra"
 	end
 
 	return spectra, metadata_headers
