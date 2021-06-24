@@ -58,8 +58,9 @@ end
 	create_impurity_profile(pathin; csvout=nothing)
 Creates and returns impurity profile from all samples in directory pathin
 Writes impurity profile to csvout if given
+Set use_filters to false to ignore filters and include all spectra in impurity profile
 """
-function create_impurity_profile(pathin; csvout=nothing)
+function create_impurity_profile(pathin; csvout=nothing, use_filters=true)
 	# Read settings.json
 	json_string = read(joinpath(@__DIR__, "settings.json"), String)
 	settings_json = JSON3.read(json_string)
@@ -68,7 +69,7 @@ function create_impurity_profile(pathin; csvout=nothing)
 	main_IS_min_ratio = settings_json[:main_settings]["main/IS min ratio"]
 
 	# Import spectra
-	spectra, metadata_headers = batch_import(pathin, settings_json)
+	spectra, metadata_headers = batch_import(pathin, settings_json, use_filters=use_filters)
 
 	# Import RT and mz info of valid compounds into DataFrame
 	compounds_csv = CSV.read("compounds.csv", DataFrame)
@@ -89,7 +90,7 @@ function create_impurity_profile(pathin; csvout=nothing)
 
 	# Analyse all spectra
 	for i=1:length(spectra)
-		println("Analysing spectrum $i...")
+		@info "Analysing spectrum $i..."
 		spectrum = spectra[i]["MS1"]
 
 		compound_mz_integrals = analyse_spectrum(spectrum, compounds_csv, main_compound, internal_standard)
@@ -186,8 +187,6 @@ function determine_RT_modifier(spectrum, main_compound, internal_standard)
 		RT_actual = spectrum["Rt"][max_scan]
 		push!(RT_modifiers, round(RT_actual / RT_predicted, digits=3))
 	end
-
-	@info "RT_modifier difference" abs(RT_modifiers[1] - RT_modifiers[2])
 
 	if abs(RT_modifiers[1] - RT_modifiers[2]) > MAX_RT_MODIFIER_DIFFERENCE
 		@info "No internal standard and/or cocaine found"
