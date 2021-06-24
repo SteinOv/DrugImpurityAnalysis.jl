@@ -78,8 +78,9 @@ end
     compound_trends(impurity_profile_csv, compound_group, month_range, minimum_value)
 Counts per month how many times each compound is above the minimum value
 Outputs this to monthly_data.csv in input folder
+show_not_containing defaults to true, displays samples not containing any of the given compounds
 """
-function compound_trends(impurity_profile_csv, compound_group, minimum_value::Number)
+function compound_trends(impurity_profile_csv, compound_group, minimum_value::Number; show_not_containing::Bool=true)
 
     # Read impurity profile and filter out control samples
     impurity_profile = CSV.read(impurity_profile_csv, DataFrame)
@@ -101,14 +102,29 @@ function compound_trends(impurity_profile_csv, compound_group, minimum_value::Nu
     for compound_name in compound_names
 		insertcols!(monthly_data, Symbol(compound_name) => Int32[])
 	end
+    if show_not_containing
+        insertcols!(monthly_data, :no_compounds => Int[])
+    end
     insertcols!(monthly_data, :total_samples => Int[])
 
     # Count times compounds above minimum value for each month
     for group in impurity_profiles_grouped
         total_samples = size(group, 1)
-        push!(monthly_data, append!([], group[1, :yearmonth], zeros(length(compound_names)), total_samples))
+        push!(monthly_data, append!([], group[1, :yearmonth], zeros(size(monthly_data, 2) - 3), total_samples))
         for compound_name in compound_names
             monthly_data[end, compound_name] = count(i -> i >= minimum_value, group[!, compound_name])
+        end
+
+        # Count how often no compound is present
+        if show_not_containing
+            data = select(group, compound_names)
+            i = 0
+            for row in eachrow(data)
+                if any(x -> x > minimum_value, row)
+                    i += 1
+                end
+            end
+            monthly_data[end, :no_compounds] = i
         end
     end
 
