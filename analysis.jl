@@ -1,14 +1,32 @@
 
 """
-    compound_percentage_occurrence(compound_name, impurity_profile_csv, date_range, minimum_value)
+    compound_percentage_occurrence(compound_name::String, impurity_profile_csv, minimum_value::Number; show_not_containing::Bool=true, date_range::Date)
 Searches through impurity profile and determines percentage occurrence of compound
 Can also search for a combination of compounds if compound_name and minimum_value are given as vector
-date_range format: [yyyy-mm-dd, yyyy-mm-dd]
+Give date_range (optional) to only display between given dates format: [yyyy-mm-dd, yyyy-mm-dd]
 """
-function compound_percentage_occurrence(compound_name::String, impurity_profile_csv, date_range, minimum_value::Number)
+function compound_percentage_occurrence(compound_name::String, impurity_profile_csv, minimum_value::Number)
     # Read impurity profile and filter on dates
     impurity_profile = CSV.read(impurity_profile_csv, DataFrame)
     date_range = sort(Date.(date_range))
+
+    # Count occurrences
+    occurrence_count = count(x -> x >= minimum_value, impurity_profile[!, compound_name])
+
+    # Determine percent occurrence
+    total_samples = nrow(impurity_profile)
+    percent_occurrence = round(occurrence_count/nrow(impurity_profile) * 100, digits=2)
+    println("Percent occurrence: $percent_occurrence, Total occurrence: $occurrence_count, Total number of samples: $total_samples")
+    return percent_occurrence, occurrence_count, total_samples
+end
+
+# Date range given
+function compound_percentage_occurrence(compound_name::String, impurity_profile_csv, minimum_value::Number; date_range::Date)
+    # Read impurity profile and filter on dates
+    impurity_profile = CSV.read(impurity_profile_csv, DataFrame)
+    date_range = sort(Date.(date_range))
+
+    # Filter date
     filter!(row -> Date(row."DateTime (y-m-d)"[1:10]) >= date_range[1] && Date(row."DateTime (y-m-d)"[1:10]) <= date_range[2] , impurity_profile)
 
     # Count occurrences
