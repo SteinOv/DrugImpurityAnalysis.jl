@@ -62,7 +62,7 @@ Set use_filters to false to ignore filters and include all spectra in impurity p
 """
 function create_impurity_profile(pathin; csvout=nothing, use_filters=true)
 	# Read settings.json
-	json_string = read(joinpath(@__DIR__, "settings.json"), String)
+	json_string = read(joinpath(dirname(@__DIR__), "settings.json"), String)
 	settings_json = JSON3.read(json_string)
 	main_compound_name = settings_json[:main_settings]["main_compound"]
 	IS_name = settings_json[:main_settings]["internal_standard"]
@@ -72,7 +72,7 @@ function create_impurity_profile(pathin; csvout=nothing, use_filters=true)
 	spectra, metadata_headers = batch_import(pathin, settings_json, use_filters=use_filters)
 
 	# Import RT and mz info of valid compounds into DataFrame
-	compounds_csv = CSV.read("compounds.csv", DataFrame)
+	compounds_csv = CSV.read(joinpath(dirname(@__DIR__), "compounds.csv"), DataFrame)
 	filter!(row -> !(any(ismissing, (row.RT, row.mz)) || any((row.RT, row.mz) .== 0)), compounds_csv)
 	main_compound = filter(row -> row.compound == main_compound_name, compounds_csv)[1, :]
 	internal_standard = filter(row -> row.compound == IS_name, compounds_csv)[1, :]

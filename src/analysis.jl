@@ -84,14 +84,19 @@ function compound_trends(impurity_profile_csv, compound_group, minimum_value::Nu
 
     # Read impurity profile and filter out control samples
     impurity_profile = CSV.read(impurity_profile_csv, DataFrame)
-    filter!(x -> !contains(x["item_number"], "CTRL"), impurity_profile)
+    if "item_number" in names(impurity_profile) 
+        filter!(x -> ismissing(x["item_number"]) || !contains(x["item_number"], "CTRL"), impurity_profile)
+    end
+
+    # Remove samples without date
+    filter!(x -> !ismissing(x["DateTime (y-m-d)"]), impurity_profile)
 
     # Group impurity profiles by month
     insertcols!(impurity_profile,1, :yearmonth => yearmonth.(map(x -> DateTime(x[1:end-1]), impurity_profile[!, "DateTime (y-m-d)"])))
     impurity_profiles_grouped = groupby(impurity_profile, :yearmonth, sort=true)
 
     # Read settings.json and retrieve compound names from group
-    json_string = read(joinpath(@__DIR__, "settings.json"), String)
+    json_string = read(joinpath(dirname(@__DIR__), "settings.json"), String)
     settings_json = JSON3.read(json_string)
     compound_names = settings_json[:compound_groups][compound_group]
 
@@ -153,7 +158,7 @@ function find_similar_samples(sample::DataFrameRow, impurity_profile_csv, compou
     end
 
     # Read settings.json and retrieve compound names from group
-    json_string = read(joinpath(@__DIR__, "settings.json"), String)
+    json_string = read(joinpath(dirname(@__DIR__), "settings.json"), String)
 	settings_json = JSON3.read(json_string)
     compound_names = settings_json[:compound_groups][compound_group]
 
@@ -196,7 +201,7 @@ function find_similar_samples(sample::Int, impurity_profile_csv, compound_group,
     sample = impurity_profile[sample, :]
 
     # Read settings.json and retrieve compound names from group
-    json_string = read(joinpath(@__DIR__, "settings.json"), String)
+    json_string = read(joinpath(dirname(@__DIR__), "settings.json"), String)
 	settings_json = JSON3.read(json_string)
     compound_names = settings_json[:compound_groups][compound_group]
 

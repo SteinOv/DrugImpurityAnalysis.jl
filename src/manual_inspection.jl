@@ -77,7 +77,7 @@ end
 Determine mz integrals for specific compound and output to csv
 """
 function mz_integrals_to_csv(pathin, compound_name)
-    json_string = read(joinpath(@__DIR__, "settings.json"), String)
+    json_string = read(joinpath(dirname(@__DIR__), "settings.json"), String)
 	settings_json = JSON3.read(json_string)
 	main_compound_name = settings_json[:main_settings]["main_compound"]
     IS_name = settings_json[:main_settings]["internal_standard"]
@@ -85,7 +85,7 @@ function mz_integrals_to_csv(pathin, compound_name)
     spectra, metadata_headers = batch_import(pathin, settings_json)
 
     # Import RT and mz info of valid compounds into DataFrame
-	compounds_csv = CSV.read("compounds.csv", DataFrame)
+	compounds_csv = CSV.read(joinpath(dirname(@__DIR__), "compounds.csv"), DataFrame)
     compound_to_analyse = filter(row -> row.compound == compound_name, compounds_csv) # DataFrame
     main_compound = filter(row -> row.compound == main_compound_name, compounds_csv)[1, :] # DataFrameRow
     internal_standard = filter(row -> row.compound == IS_name, compounds_csv)[1, :] # DataFrameRow
@@ -135,13 +135,13 @@ end
 function visualize_peak_range(spectrum, compound_name, mz, secondary_ylims=0, predicted_RT=0)
     PLOT_EXTRA_SCANS = 60
 
-    json_string = read(joinpath(@__DIR__, "settings.json"), String)
+    json_string = read(joinpath(dirname(@__DIR__), "settings.json"), String)
 	settings_json = JSON3.read(json_string)
 	main_compound_name = settings_json[:main_settings]["main_compound"]
     IS_name = settings_json[:main_settings]["internal_standard"]
 
     # Read compounds.csv
-	compounds_csv = CSV.read("compounds.csv", DataFrame)
+	compounds_csv = CSV.read(joinpath(dirname(@__DIR__), "compounds.csv"), DataFrame)
 	filter!(row -> !(any(ismissing, (row.RT, row.mz)) || any((row.RT, row.mz) .== 0)), compounds_csv)
 
     # Retrieve row of compound and main compound from compounds.csv
