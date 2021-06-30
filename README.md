@@ -1,4 +1,4 @@
-# Bachelor Project
+# DrugImpurityAnalysis.jl
 
 This program can process gc-ms files of drugs, with the focus on cocaine. The program can detect adulterants and impurities in the drug sample, and determine the fraction compared to the major drug. This can be used to find similarities between, and link different samples.
 <br/><br/><br/>
