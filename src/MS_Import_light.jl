@@ -47,6 +47,7 @@ function import_files_light(pathin,filenames,mz_thresh=[0,0],Int_thresh=0)
 
 end
 
+
 #############################################################################
 # mzxml_read_light
 
@@ -75,8 +76,6 @@ function mzxml_read_light(path2mzxml,mz_thresh,Int_thresh)
     
 end # function
 
-
-
     
 ###############################################################################
 # Reading the scans
@@ -104,8 +103,6 @@ function read_scan_light(msRun,mz_thresh,Int_thresh, row_length, col_length, msl
     return(retentionTime,mz,mz_int)
 
 end # function
-
-
 
 
 ###############################################################################
@@ -171,9 +168,7 @@ function read_scan_info_light(line,mz_thresh,Int_thresh)
 end # function
 
 
-
 ###############################################################################
-# Modified for cocaine batch processing
 # Determines scan with highest peak count and number of scans
 # This determines spectrum mz and intensity matrix size
 
@@ -194,9 +189,9 @@ function determine_matrix_size(msRun,mslevels)
 
 end # function
 
+
 ##############################################################################
 # XML encoding
-
 
 function ntoh!(A)
     for i = 1:length(A)
@@ -206,4 +201,3 @@ end
 
 
 ##############################################################################
-
