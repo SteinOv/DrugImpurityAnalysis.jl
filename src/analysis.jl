@@ -39,6 +39,7 @@ function compound_percentage_occurrence(compound_name::String, impurity_profile_
     return percent_occurrence, occurrence_count, total_samples
 end
 
+
 # Searches for combination of compounds
 function compound_percentage_occurrence(compound_name::Vector{String}, impurity_profile_csv, date_range, minimum_value::Vector{Number})
     if length(compound_name) != length(minimum_value)
@@ -96,7 +97,7 @@ function compound_trends(impurity_profile_csv, compound_group, minimum_value::Nu
     impurity_profiles_grouped = groupby(impurity_profile, :yearmonth, sort=true)
 
     # Read settings.json and retrieve compound names from group
-    json_string = read(joinpath(dirname(@__DIR__), "settings.json"), String)
+    json_string = read(joinpath(SETTINGS_JSON_LOCATION, "settings.json"), String)
     settings_json = JSON3.read(json_string)
     compound_names = settings_json[:compound_groups][compound_group]
 
@@ -138,15 +139,12 @@ function compound_trends(impurity_profile_csv, compound_group, minimum_value::Nu
 end
 
 
-# --------------------------------------------------------------------
-
 """
     find_similar_samples(sample, impurity_profile_csv, compound_group, max_deviation_fraction, date_range=0)
 Looks for similar samples in impurity profile, samples are determined as similar if for each compound: 
 {difference values / mean values <= max_deviation_fraction}
 
 sample can be input as DataFrameRow or as index (Int) within the impurity profile
-
 """
 function find_similar_samples(sample::DataFrameRow, impurity_profile_csv, compound_group, max_deviation_fraction, date_range=0)
 
@@ -158,7 +156,7 @@ function find_similar_samples(sample::DataFrameRow, impurity_profile_csv, compou
     end
 
     # Read settings.json and retrieve compound names from group
-    json_string = read(joinpath(dirname(@__DIR__), "settings.json"), String)
+    json_string = read(joinpath(SETTINGS_JSON_LOCATION, "settings.json"), String)
 	settings_json = JSON3.read(json_string)
     compound_names = settings_json[:compound_groups][compound_group]
 
@@ -186,6 +184,7 @@ function find_similar_samples(sample::DataFrameRow, impurity_profile_csv, compou
 
     return similar_samples
 end
+
 
 # Sample input as index within impurity profile
 function find_similar_samples(sample::Int, impurity_profile_csv, compound_group, max_deviation_fraction, date_range=0)
@@ -201,7 +200,7 @@ function find_similar_samples(sample::Int, impurity_profile_csv, compound_group,
     sample = impurity_profile[sample, :]
 
     # Read settings.json and retrieve compound names from group
-    json_string = read(joinpath(dirname(@__DIR__), "settings.json"), String)
+    json_string = read(joinpath(SETTINGS_JSON_LOCATION, "settings.json"), String)
 	settings_json = JSON3.read(json_string)
     compound_names = settings_json[:compound_groups][compound_group]
 
@@ -229,3 +228,5 @@ function find_similar_samples(sample::Int, impurity_profile_csv, compound_group,
 
     return similar_samples
 end
+
+# --------------------------------------------------------------------

@@ -14,6 +14,8 @@ include("manual_inspection.jl")
 include("analysis.jl")
 include("MS_Import_light.jl")
 
+
+#------ Global Variables ------#
 const MAIN_RT_DEVIATION = 1 # Absolute maximum shift of cocaine and IS peak
 const MAX_RT_MODIFIER_DIFFERENCE = 0.015 # Difference RT_modifier cocaine and IS must be lower or equal
 
@@ -25,7 +27,7 @@ const MAX_SCANS_PEAK_SEARCH = 16 # Used for differentiating peak from noise
 const MAX_SCANS_PEAK_LEFT = 40 # Bounds for peak integration (left)
 const MAX_SCANS_PEAK_RIGHT = 80 # Bounds for peak integration (right)
 
-# If fraction of median/mean crossings is above either value, noise instead of peak
+# If fraction of median/mean crossings is above either value, peak attributed to noise
 const NOISE_MEDIAN_CROSSINGS_FRACTION = 0.50
 const NOISE_MEAN_CROSSINGS_FRACTION = 0.25
 
@@ -35,6 +37,11 @@ const BASELINE_SCANS = 20
 # Used for determining overlap
 const OVERLAP_CONSECUTIVE_BELOW_MEDIAN = 2
 const OVERLAP_CONSECUTIVE_ABOVE_MEDIAN = 5
+
+const COMPOUNDS_CSV_LOCATION = dirname(@__DIR__)
+const SETTINGS_JSON_LOCATION = dirname(@__DIR__)
+#------ Global Variables End------#
+
 
 """
 	create_impurity_profiles_batch(pathin; pathout=pathin, start_at=1, append=false)
@@ -54,6 +61,7 @@ function create_impurity_profiles_batch(pathin::String; pathout::String=pathin, 
 	end
 end
 
+
 """
 	create_impurity_profile(pathin; csvout=nothing)
 Creates and returns impurity profile from all samples in directory pathin
@@ -62,7 +70,7 @@ Set use_filters to false to ignore filters and include all spectra in impurity p
 """
 function create_impurity_profile(pathin; csvout=nothing, use_filters=true)
 	# Read settings.json
-	json_string = read(joinpath(dirname(@__DIR__), "settings.json"), String)
+	json_string = read(joinpath(SETTINGS_JSON_LOCATION, "settings.json"), String)
 	settings_json = JSON3.read(json_string)
 	main_compound_name = settings_json[:main_settings]["main_compound"]
 	IS_name = settings_json[:main_settings]["internal_standard"]
@@ -72,7 +80,7 @@ function create_impurity_profile(pathin; csvout=nothing, use_filters=true)
 	spectra, metadata_headers = batch_import(pathin, settings_json, use_filters=use_filters)
 
 	# Import RT and mz info of valid compounds into DataFrame
-	compounds_csv = CSV.read(joinpath(dirname(@__DIR__), "compounds.csv"), DataFrame)
+	compounds_csv = CSV.read(joinpath(COMPOUNDS_CSV_LOCATION, "compounds.csv"), DataFrame)
 	filter!(row -> !(any(ismissing, (row.RT, row.mz)) || any((row.RT, row.mz) .== 0)), compounds_csv)
 	main_compound = filter(row -> row.compound == main_compound_name, compounds_csv)[1, :]
 	internal_standard = filter(row -> row.compound == IS_name, compounds_csv)[1, :]
@@ -111,6 +119,7 @@ function create_impurity_profile(pathin; csvout=nothing, use_filters=true)
 
 	return impurity_profiles
 end
+
 
 """
 	analyse_spectrum(spectrum, compounds_csv, main_compound, internal_standard)
@@ -156,14 +165,15 @@ function analyse_spectrum(spectrum, compounds_to_analyse, main_compound, interna
 	end
 
 	return compound_mz_integrals
-end #FUNCTION
+end
 
 
 """
-	determine_RT_modifier(spectrum, compounds)
-Determines retention time shift of cocaine and returns {RT_actual / RT_predicted}
-
-	return RT_modifier"""
+	determine_RT_modifier(spectrum, main_compound, internal_standard)
+main_compound and internal_standard should be input as DataFrameRow
+Determines retention time shift of cocaine and internal standard 
+and returns mean shift
+"""
 function determine_RT_modifier(spectrum, main_compound, internal_standard)
 
 	RT_modifiers = Vector{Float32}()
@@ -196,14 +206,14 @@ function determine_RT_modifier(spectrum, main_compound, internal_standard)
 	return round(mean(RT_modifiers), digits=3)
 end
 
+
 """
 	search_peak(spectrum_XIC, RT, spectrum)
 Searches for peak in ion-extracted chromatogram
-	
-	return peak_exists, max_scan_number"""
+Returns true or false, and scan number of maximum if true
+"""
 function search_peak(spectrum_XIC, RT, spectrum, left_scan=0, right_scan=0)
 	# Range to search peak in
-
 	RT_range = (RT - MAX_RT_SHIFT, RT + MAX_RT_SHIFT)
 	scan_range = collect(RT_to_scans(spectrum, RT_range))
 
@@ -252,6 +262,7 @@ end
 
 
 """
+	determine_overlap(spectrum_XIC, max_scan, RT_overlap_vals, spectrum)
 Determines scan numbers of maxima of overlapping peaks
 For side at which no overlap is defined, takes a simple and 
 non-thorough approach for determining whether overlap is present
@@ -318,6 +329,7 @@ end
 
 
 """
+	determine_baseline(spectrum_XIC, max_scan, overlap_max_left, overlap_max_right, bounds)
 Determines baseline based on range left of peak
 """
 function determine_baseline(spectrum_XIC, max_scan, overlap_max_left, overlap_max_right, bounds)
@@ -336,27 +348,6 @@ function determine_baseline(spectrum_XIC, max_scan, overlap_max_left, overlap_ma
 	return baseline
 end
 
-
-
-#=
-"""
-Determines baseline within bounds
-First sets all values above half of maximum to zero,
-then sets baseline to median of remaining spectrum part
-"""
-function determine_baseline(spectrum_XIC, max_scan, bounds)
-	# Set all values above half of the maximum to zero
-	spectrum_part = spectrum_XIC[round(Int, max_scan - BASELINE_SCANS / 2) : round( Int, max_scan + BASELINE_SCANS / 2)]
-	spectrum_part_cutoff = maximum(spectrum_part) / 2
-	spectrum_part = map(x -> x > spectrum_part_cutoff ? 0 : x, spectrum_part)
-
-	# Calculate median and set median as baseline
-	spectrum_part_median = median(spectrum_part)
-	baseline = fill(spectrum_part_median, length(bounds))
-
-	return baseline
-end
-=#
 
 """
 Determine bounds of peak
@@ -380,7 +371,11 @@ function determine_bounds(spectrum_XIC, max_scan, overlap_max_left, overlap_max_
 	return left_bound:right_bound
 end
 
-"""Integrates peak within bounds with baseline subtracted"""
+
+"""
+	integrate_peak(spectrum_XIC, bounds, baseline, pre_bounds)
+Integrates peak within bounds with baseline subtracted
+"""
 function integrate_peak(spectrum_XIC, bounds, baseline, pre_bounds)
 	spectrum_part = spectrum_XIC[pre_bounds]
 	# spectrum_part .-= baseline
@@ -397,8 +392,12 @@ end
 
 
 """
-	calculate_impurity_profile_values(spectrum, compound_mz_integrals, impurity_profiles)
-Returns metadata, impurity_profile_values
+	calculate_impurity_profile_values(spectrum, compound_mz_integrals, compounds_csv, 
+									  compounds_in_profile, metadata_headers, 
+									  main_compound, IS_name, main_IS_min_ratio)
+									  Returns metadata, impurity_profile_values
+Calculates values to use in impurity profile from analyzed spectra and retrieves 
+metadata to store.
 """
 function calculate_impurity_profile_values(spectrum, compound_mz_integrals, compounds_csv, 
 										   compounds_in_profile, metadata_headers, 
@@ -450,5 +449,3 @@ function calculate_impurity_profile_values(spectrum, compound_mz_integrals, comp
 
 	return metadata, impurity_profile_values
 end
-
-# main()
