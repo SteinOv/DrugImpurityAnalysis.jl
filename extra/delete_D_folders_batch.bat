@@ -1,6 +1,6 @@
-@REM Deletes all .D folders in all subdirectories of current directory
-
-@ECHO OFF
+REM Deletes all .D folders in all subdirectories of current directory
+REM Place the .bat file in the parent folder of the folders containing .D files
+ECHO OFF
 setlocal EnableDelayedExpansion
 
 
