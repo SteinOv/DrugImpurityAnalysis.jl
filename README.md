@@ -9,7 +9,7 @@ This program has only been tested on Windows.
 
 The gc-ms files must have the .mzXML extension, gc-ms files can be converted to this extension using ProteoWizard: `http://proteowizard.sourceforge.net/download.html`\
 In the "extra" folder, .bat files are present to automatically convert agilent .D folders to .mzXML after installation of ProteoWizard, but the installation location of ProteoWizard must be set to the right folder in the .bat files.\
-The program supports importing sample names of .D files, to use this feature, the .mzxml and .D files should both be in the same directory or the sample_info extracted using the .bat file.\
+The program supports importing sample names of .D files, to use this feature, the .mzxml and .D files should both be in the same directory or the sample_info extracted using the .bat file. Open the .bat files as text for more detailed instructions\
 The gc-ms files should be under data/[subfolder] and the subfolder name specified in main.jl.
 <br/><br/>
 
