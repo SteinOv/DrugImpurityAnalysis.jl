@@ -1,0 +1,22 @@
+[deps]
+Codecs = "19ecbf4d-ef7c-5e4b-b54a-0a0ff23c5aed"
+
+name = "DrugImpurityAnalysis"
+uuid = "02d66d85-0551-4dbc-b908-24b6301aad3a"
+authors = ["Stein Overtoom <stein-overtoom@live.nl>"]
+version = "1.0.0"
+
+[deps]
+Codecs = "19ecbf4d-ef7c-5e4b-b54a-0a0ff23c5aed"
+LightXML = "9c8b4983-aa76-5018-a973-4c85ecc9e179"
+JSON3 = "0f8b85d8-7281-11e9-16c2-39a750bddbf1"
+
+[compat]
+julia = "1.6.1"
+
+[extras]
+BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["BenchmarkTools", "Test"]
