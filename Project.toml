@@ -1,6 +1,3 @@
-[deps]
-Codecs = "19ecbf4d-ef7c-5e4b-b54a-0a0ff23c5aed"
-
 name = "DrugImpurityAnalysis"
 uuid = "02d66d85-0551-4dbc-b908-24b6301aad3a"
 authors = ["Stein Overtoom <stein-overtoom@live.nl>"]
