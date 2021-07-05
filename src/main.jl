@@ -1,13 +1,10 @@
 using Plots
-using Printf
 using CSV
 using DataFrames
 using LightXML
 using JSON3
 using Dates
 using Statistics
-
-using BenchmarkTools
 
 include("helpers.jl")
 include("manual_inspection.jl")
