@@ -1,7 +1,7 @@
 name = "DrugImpurityAnalysis"
 uuid = "02d66d85-0551-4dbc-b908-24b6301aad3a"
 authors = ["Stein Overtoom <stein-overtoom@live.nl>"]
-version = "0.1.0"
+version = "0.1.1"
 
 [deps]
 CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"

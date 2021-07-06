@@ -1,3 +1,6 @@
+module DrugImpurityAnalysis
+
+using Base
 using Plots
 using CSV
 using DataFrames
@@ -6,10 +9,17 @@ using JSON3
 using Dates
 using Statistics
 
+export create_impurity_profiles_batch, create_impurity_profile, analyse_spectrum
+export compound_percentage_occurrence, compound_trends, find_similar_samples
+export mz_integrals_to_csv, manual_integration, visualize_peak_range, visualize_peak_determination_steps, sort_spectra, retrieve_spectrum
+export batch_import, filter_XIC
+
+
 include("helpers.jl")
-include("manual_inspection.jl")
 include("analysis.jl")
+include("manual_inspection.jl")
 include("MS_Import_light.jl")
+
 
 
 #------ Global Variables ------#
@@ -446,3 +456,6 @@ function calculate_impurity_profile_values(spectrum, compound_mz_integrals, comp
 
 	return metadata, impurity_profile_values
 end
+
+
+end # Module
