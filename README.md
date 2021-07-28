@@ -8,13 +8,18 @@ This program can process gc-ms files of drugs, with the focus on cocaine. The pr
 
 ### Requirements and Usage
 
-This program has only been tested on Windows.
+This program has only been tested on Windows and on Julia version 1.6.1.
+
+#### Conversion to .mzxml
 
 The gc-ms files must have the .mzXML extension, gc-ms files can be converted to this extension using ProteoWizard: `http://proteowizard.sourceforge.net/download.html`\
+Download ProteoWizard for your operation system, install it and note down the installation directory.
 In the "extra" folder, .bat files are present to automatically convert agilent .D folders to .mzXML after installation of ProteoWizard, but the installation location of ProteoWizard must be set to the right folder in the .bat files.\
-The program supports importing sample names of .D files, to use this feature, the .mzxml and .D files should both be in the same directory or the sample_info extracted using the .bat file. Open the .bat files as text for more detailed instructions\
-Function create_impurity_profile creates impurity profiles from mzXML files in pathin folder. create_impurity_profiles_batch creates impurity profiles from all mzXML files in subfolders.
-<br/><br/>
+In the "convert_to_mzxml" bat files, replace `{MS_convert.exe location}` with the location of the MS_convert.exe file located in the installation directory, keep the qoutes. For example line 9 in `convert_to_mzxml.bat` could be: 
+`"C:\Program Files\ProteoWizard\ProteoWizard 3.0.21193.ccb3e0136\" "*.D" "--mzXML" "--32"` 
+
+The program supports importing sample metadata, the metadata is not present in the .mzxml files. So the .bat file automatically extracts the file containing the metadata from the .D files. The program can read this file. Optionally, if this file is not present, the program will try to find the metadata in the .D files, if present.
+
 
 compounds.csv should contain information about the major drug, impurities and adulterants.
 - RT: The expected retention time of the compound.
@@ -23,4 +28,3 @@ compounds.csv should contain information about the major drug, impurities and ad
 <br/><br/>
 
 In settings.json the following settings can me modified:
-
