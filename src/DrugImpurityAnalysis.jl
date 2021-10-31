@@ -49,7 +49,6 @@ const COMPOUNDS_CSV_LOCATION = dirname(@__DIR__)
 const SETTINGS_JSON_LOCATION = dirname(@__DIR__)
 #------ Global Variables End------#
 
-
 """
 	create_impurity_profiles_batch(pathin; pathout=pathin, start_at=1, append=false)
 Creates impurity profiles from all folders in pathin and writes to one csv file at pathout
